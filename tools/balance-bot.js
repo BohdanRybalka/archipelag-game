@@ -174,17 +174,19 @@ function bot(st0, opts) {
   opts = Object.assign({ maxSaw: 2, maxQuarry: 1, stoneW: 1.5, reclaim: 0, seed: 1 }, opts || {});
   const st = L.clone(st0);
   const log = [];
+  // steps: що саме збудовано і де, щоб відтворити гру бота (check-logic, check-ui)
+  const steps = [];
   let saws = 0, quarries = 0, guard = 0;
   while (!st.over && guard++ < 200) {
     for (let k = 0; k < 30; k++) {
       const left = st.tides * st.days - st.day;
       if (saws < opts.maxSaw && st.tools.includes('saw') && left > 4 && st.wood >= 3) {
         const p = bestProducer(st, 'saw');
-        if (p && p.v >= 8) { L.build(st, 'saw', p.c); saws++; log.push(st.day + ':saw'); continue; }
+        if (p && p.v >= 8) { L.build(st, 'saw', p.c); saws++; log.push(st.day + ':saw'); steps.push({ day: st.day, tool: 'saw', cells: [p.c] }); continue; }
       }
       if (quarries < opts.maxQuarry && st.tools.includes('quarry') && st.tools.includes('dam') && !(opts.no || []).includes('dam') && left > 4 && st.wood >= 3) {
         const p = bestProducer(st, 'quarry');
-        if (p && p.v >= 5) { L.build(st, 'quarry', p.c); quarries++; log.push(st.day + ':quarry'); continue; }
+        if (p && p.v >= 5) { L.build(st, 'quarry', p.c); quarries++; log.push(st.day + ':quarry'); steps.push({ day: st.day, tool: 'quarry', cells: [p.c] }); continue; }
       }
       const acts = actions(st, opts).map((a) => Object.assign(a, { v: a.d / Math.max(1, a.cost) }));
       if (!acts.length) break;
@@ -193,11 +195,12 @@ function bot(st0, opts) {
       if (p.kind === 'village') L.build(st, 'village', p.c);
       else if (p.kind === 'bridge') L.build(st, 'bridge', p.c, p.c2);
       else L.buildLine(st, p.cells);
+      steps.push({ day: st.day, tool: p.kind === 'dams' ? 'dam' : p.kind, cells: p.cells ? p.cells.slice() : p.kind === 'bridge' ? [p.c, p.c2] : [p.c] });
       log.push(st.day + ':' + p.kind + (p.cells ? p.cells.length : '') + (p.reclaim ? 'r' + p.reclaim : ''));
     }
     L.endDay(st);
   }
-  return { score: st.finalScore, st, log };
+  return { score: st.finalScore, st, log, steps };
 }
 function tally(log) { const t = {}; for (const e of log) { const k = e.split(':')[1].replace(/\d+.*$/, ''); t[k] = (t[k] || 0) + 1; } return t; }
 function evaluate(li, def) {

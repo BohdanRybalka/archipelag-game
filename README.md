@@ -4,6 +4,8 @@
 
 **[Грати в браузері](https://bohdanrybalka.github.io/archipelag-game/)**. Працює на комп'ютері й телефоні, нічого встановлювати не треба.
 
+> **Розробку призупинено** (жовтень 2026, тег `v3.1`). Гра завершена й лишається доступною за посиланням вище. План подальшого рефакторингу з перевірками лежить у [docs/refactor-plan.md](docs/refactor-plan.md): з нього можна продовжити.
+
 ![Головний екран](docs/screenshots/title.png)
 
 ## Як грати
@@ -110,7 +112,7 @@ npm run check
 
 ## English
 
-A small browser puzzle game about a rising sea. Build dikes, reclaim shallow water and keep your island villages connected to the town. Eight levels, plain JavaScript and three.js, no build tools needed. It started as an experiment in building a whole app from a single prompt with Claude; the `archive/` folder keeps the two earlier versions, so you can see how the design changed after each round of playtesting. **[Play it here](https://bohdanrybalka.github.io/archipelag-game/).**
+A small browser puzzle game about a rising sea. Build dikes, reclaim shallow water and keep your island villages connected to the town. Eight levels, plain JavaScript and three.js, no build tools needed. It started as an experiment in building a whole app from a single prompt with Claude; the `archive/` folder keeps the two earlier versions, so you can see how the design changed after each round of playtesting. **[Play it here](https://bohdanrybalka.github.io/archipelag-game/).** Development is paused (tag `v3.1`); the game is complete and stays playable.
 
 ## Ліцензія
 

@@ -1542,6 +1542,24 @@
     if (st && !st.over && document.body.classList.contains('in-game')) store.set('current', { li: st.li, st });
     else if (st && st.over) store.del('current');
   }
+  // збереження — недовірені дані: localStorage спільний для всіх сторінок на *.github.io цього акаунта,
+  // а поля стану потім ідуть в innerHTML. Тож перевіряємо типи, а константи рівня беремо з коду.
+  function loadSave() {
+    const cur = store.get('current', null), s = cur && cur.st;
+    if (!s) return null;
+    const num = Number.isFinite;
+    const ok = s.v === 4 && Number.isInteger(cur.li) && L.LEVELS[cur.li] && s.over === false;
+    const ref = ok && L.newLevel(cur.li);
+    const cells = (a) => Array.isArray(a) && a.length === ref.N * ref.N && a.every(num);
+    if (!ok
+      || !['W', 'W0', 'day', 'tide', 'wood', 'stone', 'lost', 'left', 'reclaimed', 'built', 'finalScore'].every((k) => num(s[k]))
+      || !['feature', 'flooded', 'bld', 'pop'].every((k) => cells(s[k]))
+      || !Array.isArray(s.bridges) || !s.bridges.every((b) => b && num(b.a) && num(b.b) && Array.isArray(b.mids) && b.mids.every(num))) {
+      store.del('current'); return null;
+    }
+    for (const k of ['li', 'N', 'name', 'tides', 'days', 'rises', 'tools', 'goals', 'height', 'town']) s[k] = ref[k];
+    return cur;
+  }
   function levelUnlocked(li) { return li === 0 || (progress.stars[li - 1] || 0) > 0; }
   async function startLevel(li, savedState) {
     Sfx.ensure();
@@ -1648,7 +1666,7 @@
     $('#menu-lvl-num').textContent = `Рівень ${menuSel + 1}`;
     $('#menu-lvl-desc').textContent = lv.intro;
     $('#menu-lvl-best').textContent = best[menuSel] ? `Найкраще: ${best[menuSel]} ${plural(best[menuSel], 'житель', 'жителі', 'жителів')}` : '';
-    const cur = store.get('current', null);
+    const cur = loadSave();
     const hasCur = cur && cur.st && cur.li === menuSel && !cur.st.over;
     $('#btn-play').innerHTML = hasCur ? `Продовжити <small>день ${cur.st.day + 1}</small>` : 'Грати';
     $('#btn-restart-lvl').hidden = !hasCur;
@@ -1677,7 +1695,7 @@
     if (sel == null) {
       sel = 0;
       for (let i = 0; i < L.LEVELS.length; i++) if (levelUnlocked(i) && !(progress.stars[i] > 0)) { sel = i; break; } else if (levelUnlocked(i)) sel = i;
-      const cur = store.get('current', null); if (cur && cur.st) sel = cur.li;
+      const cur = loadSave(); if (cur) sel = cur.li;
     }
     $('#screen-start').hidden = false;
     cam.orbit = true;
@@ -1836,7 +1854,7 @@
   function closeHelp() { $('#screen-help').hidden = true; }
 
   $('#btn-play').addEventListener('click', () => {
-    const cur = store.get('current', null);
+    const cur = loadSave();
     if (cur && cur.st && cur.li === menuSel && !cur.st.over) startLevel(menuSel, cur.st);
     else startLevel(menuSel);
   });

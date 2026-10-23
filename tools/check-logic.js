@@ -8,7 +8,7 @@ const L = require('../src/logic.js');
 const { bot } = require('./balance-bot.js');
 
 const BASELINE = path.join(__dirname, 'baseline', 'logic.json');
-// поля стану, що входять у хеш; bridges і v свідомо не входять (крок 1 прибирає bridges)
+// поля стану, що входять у хеш; службові (v, li, N, name, goals…) не входять
 const FIELDS = ['height', 'feature', 'flooded', 'bld', 'pop', 'W', 'day', 'tide', 'wood', 'stone', 'lost', 'left', 'reclaimed', 'built', 'finalScore'];
 const WITH_DAMS = { maxSaw: 3, maxQuarry: 2, reclaim: 6 };
 const NO_DAMS = { maxSaw: 3, maxQuarry: 0, reclaim: 0 };

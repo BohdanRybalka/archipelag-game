@@ -10,7 +10,6 @@
   --line-2: rgba(30, 35, 40, 0.2);
   --town: #E2483D;
   --village: #2F5FD0;
-  --bridge: #0E9E8C;
   --water: #2E7E92;
   --water-soft: #D9ECF0;
   --gold: #E8A317;
@@ -193,7 +192,6 @@ body.busy .toolbar, body.busy .undo { opacity: 0.55; pointer-events: none; }
 .flyer { position: fixed; left: 0; top: 0; z-index: 30; display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px; background: var(--ink); color: var(--paper); font: 700 14px/1 var(--f-ui); pointer-events: none; box-shadow: var(--sh-1); }
 .flyer.wood { background: var(--wood); }
 .flyer.stone { background: var(--stone); }
-.flyer.evac { background: var(--village); }
 
 /* ---------- Банер, тост, інтро, підказки ---------- */
 .banner {

@@ -46,7 +46,7 @@ function maxflowCut(st, isNode, cap, sources, sinks) {
   return cut;
 }
 function damable(st, c) {
-  if (st.bld[c] >= 0 || L.isBorder(st.N, c) || st.feature[c] === F.ROCK || L.underBridge(st, c)) return false;
+  if (st.bld[c] >= 0 || L.isBorder(st.N, c) || st.feature[c] === F.ROCK) return false;
   if (st.flooded[c] && st.height[c] < 1) return false;
   return true;
 }
@@ -98,7 +98,6 @@ function actions(st, opts) {
   const N = st.N, out = [];
   const base = L.futureScore(st);
   const has = (t) => st.tools.indexOf(t) >= 0 && !(opts.no || []).includes(t);
-  const conn = L.connectivity(st);
   const at = L.forecast(st);
   const evalBuild = (fn) => { const s = L.clone(st); if (!fn(s)) return null; return L.futureScore(s) - base; };
   for (let c = 0; c < N * N; c++) {
@@ -154,20 +153,6 @@ function actions(st, opts) {
       if (d > 0) out.push({ kind: 'dams', cells: [c], d, cost: opts.stoneW });
     }
   }
-  if (has('bridge')) {
-    for (let a = 0; a < N * N; a++) {
-      if (!L.dry(st, a)) continue;
-      for (const dir of [1, N]) for (let k = 2; k <= L.BRIDGE_MAX + 1; k++) {
-        const b = a + dir * k;
-        if (b >= N * N || (dir === 1 && ((b % N) < (a % N)))) continue;
-        const r = L.bridgeCheck(st, a, b);
-        if (!r.ok) continue;
-        if (conn[a] && conn[b] && !r.mids.some((m) => at[m] <= 2 || st.flooded[m])) continue;
-        const d = evalBuild((s) => L.build(s, 'bridge', a, b));
-        if (d > 0) out.push({ kind: 'bridge', c: a, c2: b, d, cost: r.cost.wood });
-      }
-    }
-  }
   return out;
 }
 function bot(st0, opts) {
@@ -193,9 +178,8 @@ function bot(st0, opts) {
       acts.sort((a, b) => b.v - a.v);
       const p = acts[0];
       if (p.kind === 'village') L.build(st, 'village', p.c);
-      else if (p.kind === 'bridge') L.build(st, 'bridge', p.c, p.c2);
       else L.buildLine(st, p.cells);
-      steps.push({ day: st.day, tool: p.kind === 'dams' ? 'dam' : p.kind, cells: p.cells ? p.cells.slice() : p.kind === 'bridge' ? [p.c, p.c2] : [p.c] });
+      steps.push({ day: st.day, tool: p.kind === 'dams' ? 'dam' : p.kind, cells: p.cells ? p.cells.slice() : [p.c] });
       log.push(st.day + ':' + p.kind + (p.cells ? p.cells.length : '') + (p.reclaim ? 'r' + p.reclaim : ''));
     }
     L.endDay(st);
@@ -214,9 +198,7 @@ function evaluate(li, def) {
     if (!best || r.score > best.score) best = Object.assign(r, { v });
   }
   const noDam = bot(st, Object.assign({}, best.v, { no: ['dam'] }));
-  const noBridge = bot(st, Object.assign({}, best.v, { no: ['bridge'] }));
-  const noProt = bot(st, Object.assign({}, best.v, { no: ['dam', 'bridge'] }));
-  return { st, best, noDam, noBridge, noProt, all };
+  return { st, best, noDam, all };
 }
 if (require.main === module) {
   const only = process.argv[2] != null ? +process.argv[2] : -1;
@@ -224,7 +206,7 @@ if (require.main === module) {
     if (only >= 0 && li !== only) continue;
     const t1 = Date.now();
     const r = evaluate(li);
-    console.log(`#${li + 1} ${r.st.name.padEnd(18)} best=${r.best.score} ${JSON.stringify(r.best.v)} lost=${r.best.st.lost} left=${r.best.st.left} recl=${r.best.st.reclaimed} | noDam=${r.noDam.score} noBridge=${r.noBridge.score} noProt=${r.noProt.score} | ${JSON.stringify(tally(r.best.log))} ${Date.now() - t1}ms`);
+    console.log(`#${li + 1} ${r.st.name.padEnd(18)} best=${r.best.score} ${JSON.stringify(r.best.v)} lost=${r.best.st.lost} left=${r.best.st.left} recl=${r.best.st.reclaimed} | noDam=${r.noDam.score} | ${JSON.stringify(tally(r.best.log))} ${Date.now() - t1}ms`);
   }
 }
 module.exports = { bot, evaluate, tally, protectCut };

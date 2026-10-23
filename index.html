@@ -21,7 +21,6 @@
   --line-2: rgba(30, 35, 40, 0.2);
   --town: #E2483D;
   --village: #2F5FD0;
-  --bridge: #0E9E8C;
   --water: #2E7E92;
   --water-soft: #D9ECF0;
   --gold: #E8A317;
@@ -204,7 +203,6 @@ body.busy .toolbar, body.busy .undo { opacity: 0.55; pointer-events: none; }
 .flyer { position: fixed; left: 0; top: 0; z-index: 30; display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px; background: var(--ink); color: var(--paper); font: 700 14px/1 var(--f-ui); pointer-events: none; box-shadow: var(--sh-1); }
 .flyer.wood { background: var(--wood); }
 .flyer.stone { background: var(--stone); }
-.flyer.evac { background: var(--village); }
 
 /* ---------- Банер, тост, інтро, підказки ---------- */
 .banner {
@@ -578,11 +576,9 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     village: { wood: 2, stone: 0 },
     saw: { wood: 3, stone: 0 },
     quarry: { wood: 3, stone: 0 },
-    bridge: { wood: 1, stone: 0 },  // 1 + по 1 за кожну клітинку прольоту
     dam: { wood: 0, stone: 1 },
   };
   const VMAX = 4;          // найбільше селище
-  const BRIDGE_MAX = 3;    // найдовший проліт моста
   const SAW_MAX = 2, QUARRY_MAX = 2;
 
   // ---------- Рівні ----------
@@ -811,7 +807,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
       tides: L.tides, days: L.days, rises: L.rises || new Array(L.tides).fill(1), tools: L.tools.slice(),
       height: g.height, feature: g.feature, town: g.town,
       flooded: new Array(N * N).fill(0),
-      bld: new Array(N * N).fill(-1), pop: new Array(N * N).fill(0), bridges: [],
+      bld: new Array(N * N).fill(-1), pop: new Array(N * N).fill(0),
       W: W0, W0, day: 0, tide: 0, wood: L.start.wood, stone: L.start.stone,
       lost: 0, left: 0, reclaimed: 0, built: 0, over: false, finalScore: 0,
       goals: (L.goals || [0, 0, 0]).slice(),
@@ -826,47 +822,31 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
   function clone(st) {
     const o = Object.assign({}, st);
     o.height = st.height.slice(); o.feature = st.feature.slice(); o.flooded = st.flooded.slice();
-    o.bld = st.bld.slice(); o.pop = st.pop.slice(); o.bridges = st.bridges.map((b) => ({ a: b.a, b: b.b, mids: b.mids.slice() }));
+    o.bld = st.bld.slice(); o.pop = st.pop.slice();
     o.tools = st.tools.slice(); o.rises = st.rises.slice(); o.goals = st.goals.slice();
     return o;
   }
   const dry = (st, c, fl) => !(fl || st.flooded)[c];
   const shallow = (st, c) => st.flooded[c] && st.height[c] >= 1;
-  function underBridge(st, c) { for (const b of st.bridges) if (b.mids.indexOf(c) >= 0) return true; return false; }
 
   // ---------- Зв'язність ----------
-  function bridgeAdj(st, fl) {
-    const adj = new Map();
-    for (const b of st.bridges) {
-      if (!dry(st, b.a, fl) || !dry(st, b.b, fl)) continue;
-      (adj.get(b.a) || adj.set(b.a, []).get(b.a)).push(b.b);
-      (adj.get(b.b) || adj.set(b.b, []).get(b.b)).push(b.a);
-    }
-    return adj;
-  }
   function connectivity(st, fl) {
     fl = fl || st.flooded;
     const N = st.N, conn = new Uint8Array(N * N);
-    const adj = bridgeAdj(st, fl);
     const q = [st.town]; conn[st.town] = 1;
     for (let i = 0; i < q.length; i++) {
       const u = q[i];
       for (const v of n4(st, u)) if (!conn[v] && dry(st, v, fl)) { conn[v] = 1; q.push(v); }
-      const bl = adj.get(u);
-      if (bl) for (const v of bl) if (!conn[v]) { conn[v] = 1; q.push(v); }
     }
     return conn;
   }
   // дерево доріг від міста до всіх будівель (для рендеру)
   function roadTree(st) {
-    const N = st.N, par = new Int32Array(N * N).fill(-2), via = new Int8Array(N * N);
-    const adj = bridgeAdj(st);
+    const N = st.N, par = new Int32Array(N * N).fill(-2);
     const q = [st.town]; par[st.town] = -1;
     for (let i = 0; i < q.length; i++) {
       const u = q[i];
-      for (const v of n4(st, u)) if (par[v] === -2 && dry(st, v)) { par[v] = u; via[v] = 0; q.push(v); }
-      const bl = adj.get(u);
-      if (bl) for (const v of bl) if (par[v] === -2) { par[v] = u; via[v] = 1; q.push(v); }
+      for (const v of n4(st, u)) if (par[v] === -2 && dry(st, v)) { par[v] = u; q.push(v); }
     }
     const segs = new Map();
     for (let c = 0; c < N * N; c++) {
@@ -875,7 +855,9 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
       let u = c;
       while (par[u] >= 0) {
         const p = par[u];
-        if (via[u] === 0) { const k = u < p ? u + ':' + p : p + ':' + u; if (segs.has(k)) break; segs.set(k, [Math.min(u, p), Math.max(u, p)]); }
+        const k = u < p ? u + ':' + p : p + ':' + u;
+        if (segs.has(k)) break;
+        segs.set(k, [Math.min(u, p), Math.max(u, p)]);
         u = p;
       }
     }
@@ -926,7 +908,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
   function applyTide(st) {
     st.W += st.rises[st.tide];
     const flooded = floodStep(st, st.W, st.flooded, -1);
-    const ev = { W: st.W, rise: st.rises[st.tide], flooded, lost: [], removed: [], drowned: [], broken: [], grow: [], shrink: [], abandon: [] };
+    const ev = { W: st.W, rise: st.rises[st.tide], flooded, lost: [], removed: [], drowned: [], grow: [], shrink: [], abandon: [] };
     for (const o of flooded) {
       const c = o.c, b = st.bld[c];
       if (b === B.VILLAGE) { st.lost += st.pop[c]; ev.lost.push({ c, n: st.pop[c], d: o.d }); st.pop[c] = 0; }
@@ -934,10 +916,6 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
       if (b >= 0) st.bld[c] = -1;
       if (st.feature[c] !== F.NONE) { ev.drowned.push({ c, f: st.feature[c], d: o.d }); st.feature[c] = F.NONE; }
     }
-    st.bridges = st.bridges.filter((b) => {
-      if (st.flooded[b.a] || st.flooded[b.b]) { ev.broken.push(b); return false; }
-      return true;
-    });
     const conn = connectivity(st);
     for (let c = 0; c < st.N * st.N; c++) {
       if (st.bld[c] !== B.VILLAGE) continue;
@@ -985,8 +963,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
   const daysToTide = (st) => st.days - (st.day % st.days);
 
   // ---------- Будівництво ----------
-  function costOf(tool, span) {
-    if (tool === 'bridge') return { wood: 1 + (span || 1), stone: 0 };
+  function costOf(tool) {
     return { wood: COST[tool].wood, stone: COST[tool].stone };
   }
   const afford = (st, cost) => st.wood >= cost.wood && st.stone >= cost.stone;
@@ -998,46 +975,11 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
       if (st.height[c] < 1 || isBorder(st.N, c)) return { ok: false, why: 'deep' };
     }
     if (st.feature[c] === F.ROCK) return { ok: false, why: 'rock' };
-    if (underBridge(st, c)) return { ok: false, why: 'bridge' };
     const cost = costOf(tool);
     if (!afford(st, cost)) return { ok: false, why: cost.stone > st.stone ? 'stone' : 'wood', cost };
     return { ok: true, cost };
   }
-  function bridgeCheck(st, a, b) {
-    const N = st.N;
-    if (a === b || a < 0 || b < 0) return { ok: false, why: '' };
-    const ax = a % N, ay = (a / N) | 0, bx = b % N, by = (b / N) | 0;
-    if (ax !== bx && ay !== by) return { ok: false, why: 'line' };
-    const dist = Math.abs(ax - bx) + Math.abs(ay - by), span = dist - 1;
-    if (span < 1) return { ok: false, why: 'short' };
-    if (span > BRIDGE_MAX) return { ok: false, why: 'far' };
-    if (!dry(st, a) || !dry(st, b)) return { ok: false, why: 'water' };
-    const step = ax === bx ? (by > ay ? N : -N) : (bx > ax ? 1 : -1);
-    const mids = [];
-    const lo = Math.min(st.height[a], st.height[b]);
-    let wet = 0;
-    for (let m = a + step; m !== b; m += step) {
-      if (underBridge(st, m)) return { ok: false, why: 'cross' };
-      if (st.flooded[m]) { wet++; mids.push(m); continue; }
-      if (st.height[m] >= lo || st.bld[m] >= 0 || st.feature[m] === F.ROCK) return { ok: false, why: 'blocked' };
-      mids.push(m);
-    }
-    for (const br of st.bridges) if ((br.a === a && br.b === b) || (br.a === b && br.b === a)) return { ok: false, why: 'dup' };
-    const cost = costOf('bridge', span);
-    if (!afford(st, cost)) return { ok: false, why: 'wood', cost, mids, span };
-    return { ok: true, cost, mids, span, wet };
-  }
-  function build(st, tool, c, c2) {
-    if (tool === 'bridge') {
-      const r = bridgeCheck(st, c, c2);
-      if (!r.ok) return null;
-      st.wood -= r.cost.wood; st.stone -= r.cost.stone;
-      const cleared = [];
-      for (const m of r.mids) if (st.feature[m] === F.FOREST) { st.feature[m] = F.NONE; cleared.push(m); }
-      const br = { a: c, b: c2, mids: r.mids };
-      st.bridges.push(br); st.built++;
-      return { tool, bridge: br, cleared, drained: [] };
-    }
+  function build(st, tool, c) {
     const r = checkCell(st, tool, c);
     if (!r.ok) return null;
     st.wood -= r.cost.wood; st.stone -= r.cost.stone;
@@ -1095,10 +1037,10 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
   function starsFor(st, score) { let n = 0; for (const g of st.goals) if (score >= g) n++; return n; }
 
   const Logic = {
-    MAXH, B, F, TOOLS, TOOL_B, COST, VMAX, BRIDGE_MAX, SAW_MAX, QUARRY_MAX, LEVELS,
-    rnd, hash2, n4, n8, isBorder, genMap, newLevel, clone, dry, shallow, underBridge, connectivity, roadTree,
+    MAXH, B, F, TOOLS, TOOL_B, COST, VMAX, SAW_MAX, QUARRY_MAX, LEVELS,
+    rnd, hash2, n4, n8, isBorder, genMap, newLevel, clone, dry, shallow, connectivity, roadTree,
     floodStep, drain, forecast, applyTide, around, output, income, endDay, daysToTide,
-    costOf, afford, checkCell, bridgeCheck, build, buildLine, liveScore, futureScore, nextTideRisk, starsFor,
+    costOf, afford, checkCell, build, buildLine, liveScore, futureScore, nextTideRisk, starsFor,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = Logic;
   else root.Logic = Logic;
@@ -1126,21 +1068,19 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
 
   // ---------- Кольори ----------
   const COL = {
-    town: '#E2483D', village: '#2F5FD0', saw: '#EE9F2E', quarry: '#7A5AD3', dam: '#8F8B83', pier: '#0E9E8C', bridge: '#0E9E8C',
+    town: '#E2483D', village: '#2F5FD0', saw: '#EE9F2E', quarry: '#7A5AD3', dam: '#8F8B83', pier: '#0E9E8C',
     water: '#2E7E92', forest: '#4F9E5E', rock: '#8C8F99', gold: '#E8A317', ink: '#1E2328', danger: '#D9443A', warn: '#E8A317',
     white: '#F6F4EF', road: '#F4EBD8', wood: '#B07A45', stone: '#7F8796',
   };
-  const TOOL_COL = { village: COL.village, saw: COL.saw, quarry: COL.quarry, bridge: COL.bridge, dam: COL.dam, pier: COL.pier };
-  const TOOL_NAME = { village: 'Селище', saw: 'Лісопилка', quarry: 'Каменоломня', bridge: 'Міст', dam: 'Дамба', pier: 'Причал' };
+  const TOOL_COL = { village: COL.village, saw: COL.saw, quarry: COL.quarry, dam: COL.dam };
+  const TOOL_NAME = { village: 'Селище', saw: 'Лісопилка', quarry: 'Каменоломня', dam: 'Дамба' };
   const TOOL_HINT = {
     village: 'Росте після кожного припливу, якщо з’єднане з містом',
-    saw: 'Щодня дає дерево за кожен ліс поруч, до 3',
-    quarry: 'Щодня дає камінь за кожну скелю поруч, до 2',
-    bridge: 'Клацни перший берег, потім другий. Проліт до 3 клітинок',
+    saw: `Щодня дає дерево за кожен ліс поруч, до ${L.SAW_MAX}`,
+    quarry: `Щодня дає камінь за кожну скелю поруч, до ${L.QUARRY_MAX}`,
     dam: 'Не тоне й не пускає воду. Ставиться і на мілину. Протягни лінію: замкнена вода стече',
-    pier: 'Усі причали з’єднані човном, хоч би як далеко стояли',
   };
-  const TYPE_NAME = ['Місто', 'Селище', 'Лісопилка', 'Каменоломня', 'Дамба', 'Причал'];
+  const TYPE_NAME = ['Місто', 'Селище', 'Лісопилка', 'Каменоломня', 'Дамба'];
   const SEASON_PAL = [
     { bg: '#E2E6DC', top: ['#EAD9AE', '#C9DF9F', '#AED38D', '#94C47E', '#7DB273', '#B5C2A3', '#D3D6C9', '#E6E4DA'], side: ['#D4BF93', '#C2AB86'], tree: ['#7CC46D', '#5DAE66', '#98C95C'], water: '#97CAD4' },
     { bg: '#E9E4D7', top: ['#EBD6A4', '#BFD68C', '#A1C77A', '#88B66B', '#73A462', '#B0B999', '#D0D0C1', '#E4E1D6'], side: ['#D5BE91', '#C0A882'], tree: ['#4F9E5E', '#3E8B55', '#6CAA52'], water: '#92C5D1' },
@@ -1153,18 +1093,14 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
   const fmt = (v) => (v > 0 ? '+' + v : v < 0 ? '−' + Math.abs(v) : '0');
   const esc = (s) => String(s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
   const WHY = {
-    water: 'Вода', busy: 'Зайнято', rock: 'Скеля', bridge: 'Під мостом', near: 'Надто близько до селища', coast: 'Потрібен берег',
-    wood: 'Бракує дерева', stone: 'Бракує каменю', line: 'Лише по прямій', far: 'Максимум 3 клітинки', blocked: 'Заважає суша',
-    cross: 'Тут уже міст', dup: 'Уже з’єднано', short: 'Обери дальший берег', deep: 'Тут глибоко',
+    water: 'Вода', busy: 'Зайнято', rock: 'Скеля', wood: 'Бракує дерева', stone: 'Бракує каменю', deep: 'Тут глибоко',
   };
 
   const ICON = {
     village: '<path d="M3.5 11.2 12 4l8.5 7.2V20a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1z"/>',
     saw: '<path d="m12 2.5 1.7 2.6 3-.7.5 3.1 2.8 1.3-1.4 2.8 1.4 2.8-2.8 1.3-.5 3.1-3-.7L12 21.5l-1.7-2.4-3 .7-.5-3.1-2.8-1.3L5.4 12.6 4 9.8l2.8-1.3.5-3.1 3 .7z"/><circle cx="12" cy="12" r="2.8" fill="#fff"/>',
     quarry: '<path d="M2.5 20.5v-6h6.2V9.2h6.6v5.3h6.2v6z"/><path d="m15.5 3.5 5 5-1.6 1.6-5-5z"/>',
-    bridge: '<path d="M2 7.5h20v3.2h-1.8v9.3h-2.9v-5a5.3 5.3 0 0 0-10.6 0v5H3.8v-9.3H2z"/>',
     dam: '<rect x="2.5" y="8" width="19" height="12.5" rx="1.6"/><path d="M2.5 14.2h19M8.2 8v6.2M15.8 8v6.2M12 14.2v6.3" stroke="#fff" stroke-width="1.4" fill="none"/>',
-    pier: '<path d="M2.5 14.5h19l-2.6 5a2 2 0 0 1-1.8 1H6.9a2 2 0 0 1-1.8-1z"/><path d="M11 3v10H4.5zM12.7 6v7h5.8z"/>',
     town: '<path d="M4.5 21V10.5L7.5 8V4.5h2.2v2h4.6v-2h2.2V8l3 2.5V21h-5.6v-4.2a1.9 1.9 0 0 0-3.8 0V21z"/>',
     people: '<circle cx="12" cy="7.2" r="3.7"/><path d="M4.3 20.6c.6-4.4 3.7-7.2 7.7-7.2s7.1 2.8 7.7 7.2z"/>',
     wood: '<rect x="2.5" y="7.5" width="19" height="9" rx="4.5"/><circle cx="17" cy="12" r="2.6" fill="#fff" opacity=".5"/>',
@@ -1249,7 +1185,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     },
     select() { this.tone(700, 0.07, { type: 'triangle', gain: 0.045 }); },
     build(tool) {
-      const f = { village: 440, saw: 392, quarry: 330, bridge: 494, dam: 262, pier: 523 }[tool] || 440;
+      const f = { village: 440, saw: 392, quarry: 330, dam: 262 }[tool] || 440;
       this.tone(f, 0.18, { type: 'triangle', gain: 0.11 });
       this.tone(f * 1.5, 0.12, { gain: 0.035, delay: 0.035 });
       if (tool === 'dam' || tool === 'quarry') this.noise(0.18, { gain: 0.05, from: 200, to: 700 });
@@ -1260,7 +1196,6 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     sink() { this.tone(240, 0.4, { gain: 0.05, slide: 0.45 }); },
     grow(i) { const sc = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24]; this.tone(523 * Math.pow(2, sc[i % sc.length] / 12), 0.1, { type: 'triangle', gain: 0.04, delay: i * 0.05 * TS }); },
     loss() { this.tone(196, 0.5, { type: 'triangle', gain: 0.06, slide: 0.7 }); },
-    crack() { this.noise(0.35, { gain: 0.07, from: 900, to: 2600 }); this.tone(140, 0.3, { type: 'square', gain: 0.02, slide: 0.5 }); },
     star(i) { const f = [523, 659, 784][i] || 784; this.tone(f, 0.3, { type: 'triangle', gain: 0.1 }); this.tone(f * 2, 0.22, { gain: 0.03, delay: 0.04 }); },
     whoosh() { this.noise(0.5, { gain: 0.05, from: 700, to: 2600 }); },
     drain() { this.noise(1.3, { gain: 0.08, from: 1600, to: 260 }); this.tone(330, 0.9, { type: 'triangle', gain: 0.05, slide: 0.5 }); [523, 659, 784].forEach((f, i) => this.tone(f, 0.25, { type: 'triangle', gain: 0.05, delay: 0.7 + i * 0.09 })); },
@@ -1297,7 +1232,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
   let N = 13, OFF = 6;
   const wx = (c) => (c % N) - OFF;
   const wz = (c) => ((c / N) | 0) - OFF;
-  const BH = [0.95, 0.5, 0.45, 0.6, 0, 0.45];
+  const BH = [0.95, 0.5, 0.45, 0.6, 0];
 
   // ---------- Матеріали ----------
   function std(hex, extra) {
@@ -1313,7 +1248,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     stone: std('#A6A197'), stoneTop: std('#C4BFB5'), stoneLight: std('#D8D4CB'), rock: std('#B9B3A8'),
     tree: pal0.tree.map((c) => std(c)), trunk: std('#8C6A4C'),
     road: std(COL.road), roadSide: std('#DCCFB5'),
-    town: std(COL.town), village: std(COL.village), villageDark: std('#244AA6'), saw: std(COL.saw), quarry: std(COL.quarry), pier: std(COL.pier),
+    town: std(COL.town), village: std(COL.village), villageDark: std('#244AA6'), saw: std(COL.saw), quarry: std(COL.quarry),
     foam: new THREE.MeshBasicMaterial({ color: '#FFFFFF', transparent: true, opacity: 0.75, depthWrite: false }),
   };
   M.waterShallow = std(new THREE.Color(pal0.water).lerp(new THREE.Color('#F2FBF8'), 0.38).getHex());
@@ -1489,18 +1424,6 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
         g.userData.wallMesh = wm;
         break;
       }
-      case BT.PIER: {
-        let dir = null;
-        for (const n of L.n4(st, c)) if (st.flooded[n]) { dir = [wx(n) - wx(c), wz(n) - wz(c)]; break; }
-        if (dir) body.rotation.y = Math.atan2(dir[0], dir[1]);
-        mk(body, box(0.26, 0.05, 0.86), M.wood, 0, 0.025, 0.36, ghost);
-        for (const [x, z] of [[-0.11, 0.74], [0.11, 0.74], [-0.11, 0.4], [0.11, 0.4]]) mk(body, box(0.045, 0.7, 0.045), M.woodDark, x, -0.32, z, ghost);
-        mk(body, box(0.035, 0.34, 0.035), M.dark, 0.1, 0.2, 0.74, ghost);
-        mk(body, box(0.07, 0.06, 0.07), M.pier, 0.1, 0.39, 0.74, ghost);
-        mk(body, box(0.24, 0.16, 0.2), M.white, -0.05, 0.08, -0.22, ghost);
-        mk(body, prism(0.3, 0.1, 0.24), M.pier, -0.05, 0.16, -0.22, ghost);
-        break;
-      }
     }
     if (!ghost && type !== BT.DAM) blobShadow(g, type === BT.TOWN ? 1.05 : 0.95);
     g.position.set(wx(c), type === BT.DAM ? 0 : tileTop(h), wz(c));
@@ -1556,38 +1479,6 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     return grp;
   }
 
-  // ---------- Міст ----------
-  function endY(c) { return st.bld[c] === BT.DAM ? damH(c) : tileTop(st.height[c]); }
-  function makeBridge(a, b, mids, ghost) {
-    const g = new THREE.Group();
-    const ax = wx(a), az = wz(a), bx = wx(b), bz = wz(b);
-    const dx = Math.sign(bx - ax), dz = Math.sign(bz - az);
-    const ya = endY(a) + 0.05, yb = endY(b) + 0.05;
-    const S = new THREE.Vector3(ax + dx * 0.32, ya, az + dz * 0.32);
-    const T = new THREE.Vector3(bx - dx * 0.32, yb, bz - dz * 0.32);
-    const horiz = Math.hypot(T.x - S.x, T.z - S.z), len = S.distanceTo(T);
-    const pivot = new THREE.Group(); pivot.position.copy(S);
-    pivot.rotation.order = 'YZX';
-    pivot.rotation.y = Math.atan2(-(T.z - S.z), T.x - S.x);
-    pivot.rotation.z = Math.atan2(T.y - S.y, horiz);
-    g.add(pivot);
-    const deck = mk(pivot, unitBox, M.wood, 0, 0, 0, ghost); deck.scale.set(len, 0.055, 0.32);
-    const r1 = mk(pivot, unitBox, M.pier, 0, 0.065, 0.15, ghost); r1.scale.set(len, 0.05, 0.03);
-    const r2 = mk(pivot, unitBox, M.pier, 0, 0.065, -0.15, ghost); r2.scale.set(len, 0.05, 0.03);
-    const pillars = [];
-    for (const m of mids) {
-      const px = wx(m), pz = wz(m);
-      const t = horiz ? Math.hypot(px - S.x, pz - S.z) / horiz : 0;
-      const y = lerp(S.y, T.y, t) - 0.03;
-      for (const side of [-1, 1]) {
-        const p = mk(g, box(0.07, 1, 0.07), M.woodDark, px + (dz ? side * 0.13 : 0), y / 2, pz + (dx ? side * 0.13 : 0), ghost);
-        p.scale.y = y; p.userData.h = y; pillars.push(p);
-      }
-    }
-    g.userData = { a, b, pivot, pillars, len };
-    return g;
-  }
-
   // ---------- Наліпки на клітинках ----------
   class Decals {
     constructor(tex, order) { this.tex = tex; this.pool = []; this.used = 0; this.order = order; this.group = new THREE.Group(); scene.add(this.group); }
@@ -1623,7 +1514,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
   let st = null;          // стан рівня
   let BD = null;          // тривимірна дошка
   let mode = 'title';     // title | play | busy | result
-  let tool = null, bridgeA = -1, hover = -1, pendingHover = -1;
+  let tool = null, hover = -1, pendingHover = -1;
   let line = null;        // дамба, яку протягують
   let mapMode = false, touchMode = false;
   let undo = [];
@@ -1660,7 +1551,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
   }
   function buildBoard(s, pop) {
     const grp = new THREE.Group();
-    const b = { grp, tiles: [], water: [], pick: [], feats: [], bld: new Map(), bridges: new Map(), roads: new Map(), waterVis: new Array(N * N).fill(0), roadGrp: new THREE.Group(), foam: null, ferry: null };
+    const b = { grp, tiles: [], water: [], pick: [], feats: [], bld: new Map(), roads: new Map(), waterVis: new Array(N * N).fill(0), roadGrp: new THREE.Group(), foam: null };
     grp.add(b.roadGrp);
     const pl = new THREE.Mesh(geo('plinth' + N, () => bevelBox(N + 0.36, 0.6, N + 0.36, 0.32, 0.07)), [M.plinthTop, M.plinth]);
     pl.position.y = -0.6; pl.receiveShadow = true; pl.castShadow = true; grp.add(pl);
@@ -1682,8 +1573,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     scene.add(grp);
     BD = b;
     for (let c = 0; c < N * N; c++) if (s.bld[c] >= 0) { const g = makeBuilding(s.bld[c], c, false); grp.add(g); b.bld.set(c, g); }
-    for (const br of s.bridges) { const g = makeBridge(br.a, br.b, br.mids, false); grp.add(g); b.bridges.set(br.a + '-' + br.b, g); }
-    buildFoam(); syncRoads(false); syncFerry(); updatePickAll();
+    buildFoam(); syncRoads(false); updatePickAll();
     if (pop) return popIn(b);
     return Promise.resolve();
   }
@@ -1719,16 +1609,13 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
       if (g) { g.scale.setScalar(0.001); ps.push(tween({ dur: 480, delay: delay + 260, ease: E.outBack, update: (k) => { g.scale.setScalar(Math.max(0.001, k)); } })); }
     }
     b.roadGrp.visible = false; if (b.foam) b.foam.visible = false;
-    for (const [, g] of b.bridges) g.visible = false;
     return Promise.all(ps).then(() => {
       b.roadGrp.visible = true; if (b.foam) b.foam.visible = true;
-      for (const [, g] of b.bridges) { g.visible = true; growBridge(g); }
     });
   }
   function exitBoard(b) {
     if (!b) return Promise.resolve();
     const g = b.grp;
-    if (b.ferry) b.ferry.boat.visible = false;
     return tween({ dur: 700, ease: E.inCubic, update: (k) => { g.position.y = -k * 12; g.rotation.y = k * 0.25; } })
       .then(() => { scene.remove(g); });
   }
@@ -1799,76 +1686,17 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     BD.grp.add(im); BD.foam = im;
   }
 
-  // ---------- Пором ----------
-  function waterPath(a, b) {
-    if (a === b) return [a];
-    const prev = new Int32Array(N * N).fill(-2); prev[a] = -1;
-    const q = [a];
-    for (let i = 0; i < q.length; i++) {
-      const u = q[i];
-      if (u === b) break;
-      for (const v of L.n4(st, u)) if (prev[v] === -2 && st.flooded[v]) { prev[v] = u; q.push(v); }
-    }
-    if (prev[b] === -2) return null;
-    const path = []; for (let u = b; u !== -1; u = prev[u]) path.push(u);
-    return path.reverse();
-  }
-  function makeBoat(small) {
+  // ---------- Човни на обрії ----------
+  function makeBoat() {
     const g = new THREE.Group();
-    const s = small ? 0.75 : 1;
+    const s = 0.75;
     const hull = new THREE.Mesh(box(0.34 * s, 0.08, 0.16 * s), M.white); hull.position.y = 0.04; hull.castShadow = true; g.add(hull);
-    const stripe = new THREE.Mesh(box(0.345 * s, 0.025, 0.165 * s), small ? M.town : M.pier); stripe.position.y = 0.07; g.add(stripe);
-    if (small) {
-      const mast = new THREE.Mesh(box(0.012, 0.3, 0.012), M.dark); mast.position.set(0, 0.22, 0); g.add(mast);
-      const sail = new THREE.Mesh(prism(0.18, 0.24, 0.01), M.white); sail.position.set(0.02, 0.1, 0); sail.rotation.y = Math.PI / 2; sail.castShadow = true; g.add(sail);
-    } else {
-      const cab = new THREE.Mesh(box(0.13, 0.08, 0.11), M.white); cab.position.set(-0.04, 0.12, 0); cab.castShadow = true; g.add(cab);
-      const roof = new THREE.Mesh(box(0.15, 0.02, 0.13), M.pier); roof.position.set(-0.04, 0.17, 0); g.add(roof);
-    }
+    const stripe = new THREE.Mesh(box(0.345 * s, 0.025, 0.165 * s), M.town); stripe.position.y = 0.07; g.add(stripe);
+    const mast = new THREE.Mesh(box(0.012, 0.3, 0.012), M.dark); mast.position.set(0, 0.22, 0); g.add(mast);
+    const sail = new THREE.Mesh(prism(0.18, 0.24, 0.01), M.white); sail.position.set(0.02, 0.1, 0); sail.rotation.y = Math.PI / 2; sail.castShadow = true; g.add(sail);
     return g;
   }
-  function syncFerry() {
-    if (!BD) return;
-    const piers = [];
-    for (let c = 0; c < N * N; c++) if (st.bld[c] === BT.PIER) piers.push(c);
-    if (BD.ferry) { BD.grp.remove(BD.ferry.boat); BD.ferry = null; }
-    if (piers.length < 2) return;
-    const water = piers.map((p) => { for (const n of L.n4(st, p)) if (st.flooded[n]) return n; return -1; });
-    const route = [];
-    for (let i = 0; i < piers.length; i++) {
-      const a = water[i], b = water[(i + 1) % piers.length];
-      if (a < 0 || b < 0) continue;
-      const path = waterPath(a, b);
-      if (path) route.push(path.map((c) => new THREE.Vector2(wx(c), wz(c))));
-    }
-    if (!route.length) return;
-    const boat = makeBoat(false);
-    BD.grp.add(boat);
-    BD.ferry = { boat, route, t: 0 };
-  }
-  function stepFerry(dt, t) {
-    const f = BD && BD.ferry; if (!f) return;
-    const speed = 1.6, dwell = 0.7;
-    let total = 0;
-    const lens = f.route.map((seg) => { let l = 0; for (let i = 1; i < seg.length; i++) l += seg[i].distanceTo(seg[i - 1]); total += l / speed + dwell; return l; });
-    f.t = (f.t + dt) % Math.max(0.01, total);
-    let tt = f.t, si = 0;
-    for (; si < f.route.length; si++) { const d = lens[si] / speed + dwell; if (tt < d) break; tt -= d; }
-    si = Math.min(si, f.route.length - 1);
-    const seg = f.route[si]; const mv = Math.max(0, tt - dwell / 2) * speed;
-    let acc = 0, x = seg[0].x, z = seg[0].y, ang = f.boat.rotation.y;
-    for (let i = 1; i < seg.length; i++) {
-      const l = seg[i].distanceTo(seg[i - 1]);
-      if (acc + l >= mv) { const k = (mv - acc) / l; x = lerp(seg[i - 1].x, seg[i].x, k); z = lerp(seg[i - 1].y, seg[i].y, k); ang = Math.atan2(-(seg[i].y - seg[i - 1].y), seg[i].x - seg[i - 1].x); break; }
-      acc += l; x = seg[i].x; z = seg[i].y;
-    }
-    f.boat.position.set(x, waterTop(st.W) + Math.sin(t * 2.2) * 0.01, z);
-    let da = ang - f.boat.rotation.y; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
-    f.boat.rotation.y += da * 0.15;
-  }
-
-  // ---------- Човни на обрії ----------
-  const sailors = [makeBoat(true), makeBoat(true)];
+  const sailors = [makeBoat(), makeBoat()];
   sailors.forEach((b) => { scene.add(b); b.visible = false; });
   function stepSailors(t) {
     const show = !!BD;
@@ -2008,28 +1836,10 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     return `${svgI('people', null, 13)}<b>${d > 0 ? '+' + d : fmt(d)}</b>`;
   }
   function validCells(t) {
-    return cached('valid' + t + bridgeA, () => {
+    return cached('valid' + t, () => {
       const out = [];
-      if (t === 'bridge') {
-        if (bridgeA < 0) { for (let c = 0; c < N * N; c++) if (L.dry(st, c) && bridgeEnds(c).length) out.push(c); }
-        else out.push(...bridgeEnds(bridgeA));
-        return out;
-      }
       for (let c = 0; c < N * N; c++) { const r = L.checkCell(st, t, c); if (r.ok || r.why === 'wood' || r.why === 'stone') out.push(c); }
       return out;
-    });
-  }
-  function bridgeEnds(a) {
-    return cached('be' + a, () => {
-      const res = [];
-      for (const d of [1, -1, N, -N]) for (let k = 2; k <= L.BRIDGE_MAX + 1; k++) {
-        const b = a + d * k;
-        if (b < 0 || b >= N * N) break;
-        if ((d === 1 || d === -1) && ((b / N) | 0) !== ((a / N) | 0)) break;
-        const r = L.bridgeCheck(st, a, b);
-        if (r.ok || r.why === 'wood') res.push(b);
-      }
-      return res;
     });
   }
   function previewDelta(key, fn) {
@@ -2044,22 +1854,18 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     clearChips('preview');
     D.hl.begin(); D.cursor.begin(); D.dots.begin();
     let hypoAt = null;
-    if (st && BD && mode === 'play' && (tool === 'village' || tool === 'bridge')) {
+    if (st && BD && mode === 'play' && tool === 'village') {
       const col = TOOL_COL[tool];
       for (const c of validCells(tool)) D.dots.add(c, col, 0.55, surfY(c), 0.62);
     }
     if (st && BD && mode === 'play' && tool === 'dam') {
       for (const c of validCells('dam')) if (st.flooded[c]) D.dots.add(c, COL.ink, 0.38, surfY(c), 0.55);
     }
-    if (st && BD && mode === 'play' && tool) {
-      if (tool === 'bridge' && bridgeA >= 0) D.cursor.add(bridgeA, COL.bridge, 1, surfY(bridgeA));
-    }
     if (st && BD && mode === 'play' && tool === 'dam' && (line || hover >= 0)) {
       hypoAt = previewDamLine(line ? line.cells : [hover]);
     } else if (st && BD && mode === 'play' && hover >= 0) {
       const c = hover;
-      if (tool === 'bridge') previewBridge(c);
-      else if (tool) {
+      if (tool) {
         const chk = L.checkCell(st, tool, c);
         const t = L.TOOL_B[tool];
         if (chk.ok || chk.why === 'wood' || chk.why === 'stone') {
@@ -2123,29 +1929,6 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     const last = good[good.length - 1];
     addChip(html, cellPos(last, damH(last) + 0.3), 'total' + (enough ? '' : ' is-bad'), 'preview', -4);
     return res.at;
-  }
-  function previewBridge(c) {
-    if (bridgeA < 0) {
-      hideGhost();
-      if (L.dry(st, c) && bridgeEnds(c).length) D.cursor.add(c, COL.bridge, 0.9, surfY(c));
-      else { D.cursor.add(c, COL.danger, 0.7, surfY(c)); addChip(esc(L.dry(st, c) ? 'Звідси не дотягнеш' : 'Почни з суші'), cellPos(c), 'warn', 'preview'); }
-      return;
-    }
-    if (c === bridgeA) { hideGhost(); return; }
-    const r = L.bridgeCheck(st, bridgeA, c);
-    if (r.ok || r.why === 'wood') {
-      showGhost('br' + bridgeA + '-' + c, () => makeBridge(bridgeA, c, r.mids, true));
-      D.cursor.add(c, r.ok ? COL.bridge : COL.danger, 1, surfY(c));
-      const d = r.ok ? previewDelta('br' + bridgeA + '-' + c, (s) => L.build(s, 'bridge', bridgeA, c)) : 0;
-      const yy = Math.max(endY(bridgeA), endY(c)) + 0.35;
-      const mid = new THREE.Vector3((wx(bridgeA) + wx(c)) / 2, yy, (wz(bridgeA) + wz(c)) / 2);
-      const html = r.ok ? `${deltaChip(d || 0)}<span>${svgI('wood', null, 12)} −${r.cost.wood}</span>${touchMode ? '<i class="tap">торкнись ще раз</i>' : ''}` : `<em class="bad">${WHY.wood}</em>`;
-      addChip(html, mid, 'total' + (r.ok ? '' : ' is-bad'), 'preview', -4);
-    } else {
-      hideGhost();
-      D.cursor.add(c, COL.danger, 0.7, surfY(c));
-      if (WHY[r.why]) addChip(esc(WHY[r.why]), cellPos(c), 'warn', 'preview');
-    }
   }
   function cellInfo(c) {
     const b = st.bld[c];
@@ -2219,20 +2002,6 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
       tween({ dur: 650, ease: E.linear, update: (k) => { const d = Math.exp(-4.6 * k) * Math.cos(k * Math.PI * 4.4); g.scale.set(1 + 0.22 * d, 1 - 0.32 * d, 1 + 0.22 * d); }, done: () => g.scale.set(1, 1, 1) });
     });
   }
-  function growBridge(g) {
-    const pv = g.userData.pivot;
-    pv.scale.x = 0.001;
-    for (const p of g.userData.pillars) p.scale.y = 0.001;
-    g.userData.pillars.forEach((p, i) => tween({ dur: 360, delay: 80 + i * 40, ease: E.outBack, update: (k) => { p.scale.y = Math.max(0.001, p.userData.h * k); } }));
-    const n = Math.max(1, Math.round(g.userData.len / 0.5));
-    for (let i = 0; i < n; i++) Sfx.knock(i);
-    return tween({ dur: 520, ease: E.outCubic, update: (k) => { pv.scale.x = Math.max(0.001, k); } });
-  }
-  function collapseBridge(g, delay) {
-    const pv = g.userData.pivot;
-    return tween({ dur: 900, delay, ease: E.inCubic, update: (k) => { pv.rotation.x = k * 0.5; g.position.y = -k * 1.2; }, start: () => Sfx.crack() })
-      .then(() => g.parent && g.parent.remove(g));
-  }
   function flyTo(text, fromPos, target, cls) {
     const s = toScreen(fromPos);
     const r = target.getBoundingClientRect();
@@ -2304,9 +2073,9 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     if (bar.dataset.k !== tools.join(',')) {
       bar.dataset.k = tools.join(',');
       bar.innerHTML = tools.map((t, i) => {
-        const cost = L.costOf(t, 1);
+        const cost = L.costOf(t);
         const c = [];
-        if (cost.wood) c.push(`${svgI('wood', null, 11)}${cost.wood}${t === 'bridge' ? '<small>/кл</small>' : ''}`);
+        if (cost.wood) c.push(`${svgI('wood', null, 11)}${cost.wood}`);
         if (cost.stone) c.push(`${svgI('stone', null, 11)}${cost.stone}`);
         return `<button type="button" class="tbtn" data-tool="${t}" style="--c:${TOOL_COL[t]}" aria-label="${TOOL_NAME[t]}, клавіша ${i + 1}">
           <span class="tb-ico">${svgI(t, '#fff', 22)}</span><span class="tb-name">${TOOL_NAME[t]}</span><span class="tb-cost">${c.join(' ')}</span><span class="tb-key">${i + 1}</span>
@@ -2316,7 +2085,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     }
     bar.querySelectorAll('.tbtn').forEach((b) => {
       const t = b.dataset.tool;
-      b.classList.toggle('poor', !L.afford(st, L.costOf(t, 1)));
+      b.classList.toggle('poor', !L.afford(st, L.costOf(t)));
       b.classList.toggle('is-sel', t === tool);
       b.setAttribute('aria-pressed', t === tool ? 'true' : 'false');
     });
@@ -2369,10 +2138,8 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     next: { text: 'Коли збудуєш усе, що хочеш, натисни «Далі»', at: () => $('#next') },
     roads: { text: 'Селище без дороги до міста порожніє', at: () => $('#scorebox') },
     saw: { text: 'Дерево скінчилось? Лісопилка біля лісу дає його щодня', at: () => $('#toolbar [data-tool="saw"]') },
-    bridge: { text: 'Клацни перший берег, потім другий', at: () => $('#toolbar [data-tool="bridge"]') },
     dam: { text: 'Протягни дамбу від берега до берега. Обведене кільцями лишиться сухим', at: () => $('#toolbar [data-tool="dam"]') },
     land: { text: 'Замкнена вода стекла. На новій суші можна будувати', at: () => $('#scorebox') },
-    pier: { text: 'Потрібно щонайменше два причали', at: () => $('#toolbar [data-tool="pier"]') },
     undo: { text: 'Передумав? Скасуй будівництво до кінця дня', at: () => $('#undo') },
   };
   function hint(id) {
@@ -2409,22 +2176,19 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
   function selectTool(t) {
     if (mode !== 'play' || !st || st.tools.indexOf(t) < 0) return;
     tool = tool === t ? null : t;
-    bridgeA = -1; line = null;
+    line = null;
     Sfx.select(); hideIntro();
     document.body.classList.toggle('has-tool', !!tool);
     renderToolbar(); refreshPreview();
     if (tool) {
-      const cost = L.costOf(tool, 1);
+      const cost = L.costOf(tool);
       if (!L.afford(st, cost)) toast(`${svgI(cost.stone > st.stone ? 'stone' : 'wood', null, 14)} ${cost.stone > st.stone ? WHY.stone : WHY.wood}`);
       if (tool === 'village') hintDone('pick');
-      if (tool === 'bridge') hint('bridge');
       if (tool === 'dam') hint('dam');
-      if (tool === 'pier') hint('pier');
-    } else if (hintId && ['bridge', 'dam', 'pier'].indexOf(hintId) >= 0) hintDone();
+    } else if (hintId === 'dam') hintDone();
   }
   function deselect() {
     if (line) { line = null; refreshPreview(); return; }
-    if (bridgeA >= 0) { bridgeA = -1; refreshPreview(); return; }
     if (tool) { tool = null; document.body.classList.remove('has-tool'); renderToolbar(); refreshPreview(); }
   }
   function changed() {
@@ -2434,34 +2198,24 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     save();
   }
 
-  function doBuild(c, c2) {
+  function doBuild(c) {
     if (mode !== 'play' || !tool) return;
     const t = tool;
     const snap = L.clone(st);
-    const ev = L.build(st, t, c, c2);
+    const ev = L.build(st, t, c);
     if (!ev) { Sfx.bad(); return; }
     undo.push(snap);
     hideGhost(); clearChips('preview');
     Sfx.build(t);
-    if (t === 'bridge') {
-      const br = ev.bridge;
-      for (const m of ev.cleared) removeFeature(m, true);
-      const g = makeBridge(br.a, br.b, br.mids, false);
-      BD.grp.add(g); BD.bridges.set(br.a + '-' + br.b, g);
-      growBridge(g);
-      bridgeA = -1;
-    } else {
-      if (ev.hadForest) removeFeature(c, true);
-      const g = makeBuilding(L.TOOL_B[t], c, false);
-      BD.grp.add(g); BD.bld.set(c, g);
-      if (t === 'dam' && BD.tiles[c]) BD.tiles[c].visible = false;
-      dropIn(g);
-      ripple(c, TOOL_COL[t], t === 'dam' ? damH(c) : tileTop(st.height[c]));
-      if (t === 'pier') syncFerry();
-    }
+    if (ev.hadForest) removeFeature(c, true);
+    const g = makeBuilding(L.TOOL_B[t], c, false);
+    BD.grp.add(g); BD.bld.set(c, g);
+    if (t === 'dam' && BD.tiles[c]) BD.tiles[c].visible = false;
+    dropIn(g);
+    ripple(c, TOOL_COL[t], t === 'dam' ? damH(c) : tileTop(st.height[c]));
     ver++;
     syncRoads(true); updatePickAll();
-    if (!L.afford(st, L.costOf(t, t === 'bridge' ? 1 : 1))) { tool = null; document.body.classList.remove('has-tool'); }
+    if (!L.afford(st, L.costOf(t))) { tool = null; document.body.classList.remove('has-tool'); }
     changed();
     if (hintId === t) hintDone(t);
     if (st.li === 0) { hintDone('pick'); setTimeout(() => hint('next'), 500 * TS); }
@@ -2541,7 +2295,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
   function doUndo() {
     if (mode !== 'play' || !undo.length) return;
     st = undo.pop();
-    hideGhost(); bridgeA = -1;
+    hideGhost();
     disposeBoardNow();
     buildBoard(st, false);
     Sfx.whoosh();
@@ -2552,7 +2306,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
   async function nextDay() {
     if (mode !== 'play' || !st || st.over) return;
     mode = 'busy'; document.body.classList.add('busy');
-    tool = null; bridgeA = -1; hover = -1; line = null; document.body.classList.remove('has-tool');
+    tool = null; hover = -1; line = null; document.body.classList.remove('has-tool');
     hideGhost(); clearChips('preview'); refreshPreview(); renderToolbar(); renderNext();
     if (hintId === 'next' || hintId === 'undo') hintDone();
     hideIntro();
@@ -2601,7 +2355,6 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
       ps.push(tw(c, top, delay, 650).then(() => { if (BD.tiles[c]) BD.tiles[c].visible = false; }));
       if (o.d < 5) tween({ dur: 1, delay: delay + 400 }).then(() => ripple(c, '#FFFFFF', top));
     }
-    for (const br of ev.broken) { const k = br.a + '-' + br.b; const g = BD.bridges.get(k); BD.bridges.delete(k); if (g) ps.push(collapseBridge(g, 350)); }
     if (ev.lost.length) tween({ dur: 1, delay: 600 }).then(() => Sfx.loss());
     if (ev.removed.length || ev.lost.length) tween({ dur: 1, delay: 500 }).then(() => Sfx.sink());
     for (const o of ev.lost) {
@@ -2617,13 +2370,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     ps.push(applySeason(seasonIdx(st), 1500, 450));
     await Promise.all(ps);
     ver++;
-    buildFoam(); syncRoads(true); syncFerry(); updatePickAll();
-    for (const br of st.bridges) {
-      if (st.bld[br.a] !== BT.DAM && st.bld[br.b] !== BT.DAM) continue;
-      const k = br.a + '-' + br.b, old = BD.bridges.get(k);
-      if (old) BD.grp.remove(old);
-      const g = makeBridge(br.a, br.b, br.mids, false); BD.grp.add(g); BD.bridges.set(k, g);
-    }
+    buildFoam(); syncRoads(true); updatePickAll();
     let gi = 0;
     for (const c of ev.grow) {
       const g = BD.bld.get(c); if (!g) continue;
@@ -2661,8 +2408,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     const cells = (a) => Array.isArray(a) && a.length === ref.N * ref.N && a.every(num);
     if (!ok
       || !['W', 'W0', 'day', 'tide', 'wood', 'stone', 'lost', 'left', 'reclaimed', 'built', 'finalScore'].every((k) => num(s[k]))
-      || !['feature', 'flooded', 'bld', 'pop'].every((k) => cells(s[k]))
-      || !Array.isArray(s.bridges) || !s.bridges.every((b) => b && num(b.a) && num(b.b) && Array.isArray(b.mids) && b.mids.every(num))) {
+      || !['feature', 'flooded', 'bld', 'pop'].every((k) => cells(s[k]))) {
       store.del('current'); return null;
     }
     for (const k of ['li', 'N', 'name', 'tides', 'days', 'rises', 'tools', 'goals', 'height', 'town']) s[k] = ref[k];
@@ -2675,7 +2421,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     mode = 'busy'; document.body.classList.add('busy', 'in-game');
     cam.orbit = false;
     cam.thetaT = Math.PI / 4 + Math.round((cam.theta - Math.PI / 4) / (Math.PI / 2)) * (Math.PI / 2);
-    tool = null; bridgeA = -1; hover = -1; mapMode = false; undo = [];
+    tool = null; hover = -1; mapMode = false; undo = [];
     hintId = null; $('#hint').hidden = true;
     hideGhost(); clearChips('preview'); clearChips('map'); clearChips('status');
     D.forecast.clear(); D.map.clear(); D.dots.clear(); D.hl.clear(); D.cursor.clear();
@@ -2797,7 +2543,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     mode = 'title';
     document.body.classList.remove('in-game', 'busy', 'has-tool');
     $('#hud').hidden = true;
-    tool = null; bridgeA = -1; hover = -1; hideGhost(); clearChips('preview'); clearChips('map'); clearChips('status');
+    tool = null; hover = -1; hideGhost(); clearChips('preview'); clearChips('map'); clearChips('status');
     D.forecast.clear(); D.map.clear(); D.dots.clear(); D.hl.clear(); D.cursor.clear();
     let sel = li;
     if (sel == null) {
@@ -2821,7 +2567,7 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     const hits = raycaster.intersectObjects(BD.pick, false);
     if (!hits.length) return -1;
     // з вибраним інструментом низьку клітинку за високою сусідкою теж можна влучити
-    if (tool && tool !== 'bridge' && mode === 'play') {
+    if (tool && mode === 'play') {
       const ok = (c) => { const r = L.checkCell(st, tool, c); return r.ok || r.why === 'wood' || r.why === 'stone'; };
       const first = hits[0].object.userData.cell;
       if (!ok(first)) for (let i = 1; i < Math.min(hits.length, 4); i++) { const c = hits[i].object.userData.cell; if (hits[i].distance - hits[0].distance > 1.6) break; if (ok(c)) return c; }
@@ -2903,23 +2649,6 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     const c = pickCell(e.clientX, e.clientY);
     const mouse = e.pointerType === 'mouse';
     if (!tool) { if (!mouse) { hover = c; refreshPreview(); } return; }
-    if (tool === 'bridge') {
-      if (bridgeA < 0) {
-        if (c >= 0 && L.dry(st, c) && bridgeEnds(c).length) { bridgeA = c; Sfx.select(); hover = mouse ? c : -1; refreshPreview(); }
-        else { Sfx.bad(); if (!mouse) { hover = c; refreshPreview(); } }
-        return;
-      }
-      if (c === bridgeA || c < 0) { bridgeA = -1; refreshPreview(); return; }
-      const r = L.bridgeCheck(st, bridgeA, c);
-      if (!r.ok) {
-        if (r.why === 'wood') { Sfx.bad(); toast(`${svgI('wood', null, 14)} ${WHY.wood}`); return; }
-        if (L.dry(st, c) && bridgeEnds(c).length) { bridgeA = c; Sfx.select(); hover = mouse ? c : -1; refreshPreview(); return; }
-        Sfx.bad(); if (!mouse) { hover = c; refreshPreview(); } return;
-      }
-      if (mouse || hover === c) doBuild(bridgeA, c);
-      else { hover = c; refreshPreview(); }
-      return;
-    }
     if (c < 0) { hover = -1; refreshPreview(); return; }
     const chk = L.checkCell(st, tool, c);
     if (!chk.ok) {
@@ -2952,8 +2681,8 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
     const el = $('#screen-help'); el.hidden = false; el.classList.remove('in'); void el.offsetWidth; el.classList.add('in');
     $('#help-ingame').hidden = !(st && document.body.classList.contains('in-game'));
     $('#help-tools').innerHTML = L.TOOLS.map((t) => {
-      const cost = L.costOf(t, 1); const c = [];
-      if (cost.wood) c.push(`${svgI('wood', null, 11)}${cost.wood}${t === 'bridge' ? '/кл' : ''}`);
+      const cost = L.costOf(t); const c = [];
+      if (cost.wood) c.push(`${svgI('wood', null, 11)}${cost.wood}`);
       if (cost.stone) c.push(`${svgI('stone', null, 11)}${cost.stone}`);
       return `<div class="ht" style="--c:${TOOL_COL[t]}"><span class="tb-ico">${svgI(t, '#fff', 18)}</span><span class="ht-txt"><b>${TOOL_NAME[t]}</b><em>${c.join(' ')}</em><span>${esc(TOOL_HINT[t])}</span></span></div>`;
     }).join('');
@@ -3005,7 +2734,6 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
         if (a.arm) a.arm.rotation.y = Math.sin(t * 0.6 + a.phase) * 0.9;
         if (a.flag) { a.flag.rotation.y = Math.sin(t * 3) * 0.25; a.flag.scale.x = 1 + Math.sin(t * 5) * 0.06; }
       }
-      stepFerry(dt, t);
       M.foam.opacity = 0.55 + Math.sin(t * 1.6) * 0.18;
     }
     stepSailors(t);
@@ -3022,18 +2750,12 @@ body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: abso
   $('#btn-sound').classList.toggle('off', !Sfx.on);
   requestAnimationFrame(frame);
 
-  function boot(data) {
-    if (data && data.st && !data.st.over && data.st.v === 4) { startLevel(data.st.li, data.st); return; }
-    toTitle();
-  }
-  const hot = window.claude && window.claude.hot;
-  if (hot && hot.snapshot) { try { hot.snapshot(() => ({ st: st && document.body.classList.contains('in-game') && !st.over ? L.clone(st) : null })); } catch (e) { /* */ } }
-  if (hot && hot.ready) hot.ready(boot); else boot(hot && hot.data ? hot.data : {});
+  toTitle();
 
-  // для автоматичної перевірки
+  // хук для перевірок у браузері (tools/check-ui.js): не прибирати
   window.__arch = {
-    state: () => ({ mode, st, tool, hover, bridgeA }),
-    build: (t, c, c2) => { tool = t; return doBuild(c, c2); },
+    state: () => ({ mode, st, tool, hover }),
+    build: (t, c) => { tool = t; return doBuild(c); },
     next: () => nextDay(),
     start: (li) => startLevel(li),
     screen: (c) => toScreen(new THREE.Vector3(wx(c), tileTop(st.height[c]), wz(c))),

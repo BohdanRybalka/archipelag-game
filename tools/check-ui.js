@@ -119,7 +119,7 @@ async function u2(browser, li) {
   assert(await page.locator('#screen-result').isVisible(), `рівень ${li + 1}: екран результату не видно`);
   eq(+(await text(page, '#res-table .sum b')), r.score, `рівень ${li + 1}: бали на екрані результату (бот)`);
   const fin = await page.evaluate((fields) => { const st = __arch.state().st; const o = {}; for (const k of fields) o[k] = st[k]; return o; }, FIELDS);
-  eq(stateHash(fin, r.steps), stateHash(r.st, r.steps), `рівень ${li + 1}: хеш фінального стану (бот)`);
+  eq(stateHash(fin), stateHash(r.st), `рівень ${li + 1}: хеш фінального стану (бот)`);
   if (li === 1) { await sleep(1500); await shot(page, 'u5-level2-result.png'); }
   return errors;
 }
@@ -201,5 +201,5 @@ const SCENARIOS = [
   }
   await browser.close();
   if (failed) { console.error(`check:ui FAIL: ${failed} з ${run.length}`); process.exit(1); }
-  console.log(`check:ui OK: ${run.length} сценаріїв, скриншоти в ${path.relative(process.cwd(), OUT) || '.'}`);
+  console.log(`check:ui OK: ${run.length} з ${SCENARIOS.length} сценаріїв, скриншоти в ${path.relative(process.cwd(), OUT) || '.'}`);
 })();

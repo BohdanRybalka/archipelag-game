@@ -11,11 +11,9 @@
     village: { wood: 2, stone: 0 },
     saw: { wood: 3, stone: 0 },
     quarry: { wood: 3, stone: 0 },
-    bridge: { wood: 1, stone: 0 },  // 1 + по 1 за кожну клітинку прольоту
     dam: { wood: 0, stone: 1 },
   };
   const VMAX = 4;          // найбільше селище
-  const BRIDGE_MAX = 3;    // найдовший проліт моста
   const SAW_MAX = 2, QUARRY_MAX = 2;
 
   // ---------- Рівні ----------
@@ -244,7 +242,7 @@
       tides: L.tides, days: L.days, rises: L.rises || new Array(L.tides).fill(1), tools: L.tools.slice(),
       height: g.height, feature: g.feature, town: g.town,
       flooded: new Array(N * N).fill(0),
-      bld: new Array(N * N).fill(-1), pop: new Array(N * N).fill(0), bridges: [],
+      bld: new Array(N * N).fill(-1), pop: new Array(N * N).fill(0),
       W: W0, W0, day: 0, tide: 0, wood: L.start.wood, stone: L.start.stone,
       lost: 0, left: 0, reclaimed: 0, built: 0, over: false, finalScore: 0,
       goals: (L.goals || [0, 0, 0]).slice(),
@@ -259,47 +257,31 @@
   function clone(st) {
     const o = Object.assign({}, st);
     o.height = st.height.slice(); o.feature = st.feature.slice(); o.flooded = st.flooded.slice();
-    o.bld = st.bld.slice(); o.pop = st.pop.slice(); o.bridges = st.bridges.map((b) => ({ a: b.a, b: b.b, mids: b.mids.slice() }));
+    o.bld = st.bld.slice(); o.pop = st.pop.slice();
     o.tools = st.tools.slice(); o.rises = st.rises.slice(); o.goals = st.goals.slice();
     return o;
   }
   const dry = (st, c, fl) => !(fl || st.flooded)[c];
   const shallow = (st, c) => st.flooded[c] && st.height[c] >= 1;
-  function underBridge(st, c) { for (const b of st.bridges) if (b.mids.indexOf(c) >= 0) return true; return false; }
 
   // ---------- Зв'язність ----------
-  function bridgeAdj(st, fl) {
-    const adj = new Map();
-    for (const b of st.bridges) {
-      if (!dry(st, b.a, fl) || !dry(st, b.b, fl)) continue;
-      (adj.get(b.a) || adj.set(b.a, []).get(b.a)).push(b.b);
-      (adj.get(b.b) || adj.set(b.b, []).get(b.b)).push(b.a);
-    }
-    return adj;
-  }
   function connectivity(st, fl) {
     fl = fl || st.flooded;
     const N = st.N, conn = new Uint8Array(N * N);
-    const adj = bridgeAdj(st, fl);
     const q = [st.town]; conn[st.town] = 1;
     for (let i = 0; i < q.length; i++) {
       const u = q[i];
       for (const v of n4(st, u)) if (!conn[v] && dry(st, v, fl)) { conn[v] = 1; q.push(v); }
-      const bl = adj.get(u);
-      if (bl) for (const v of bl) if (!conn[v]) { conn[v] = 1; q.push(v); }
     }
     return conn;
   }
   // дерево доріг від міста до всіх будівель (для рендеру)
   function roadTree(st) {
-    const N = st.N, par = new Int32Array(N * N).fill(-2), via = new Int8Array(N * N);
-    const adj = bridgeAdj(st);
+    const N = st.N, par = new Int32Array(N * N).fill(-2);
     const q = [st.town]; par[st.town] = -1;
     for (let i = 0; i < q.length; i++) {
       const u = q[i];
-      for (const v of n4(st, u)) if (par[v] === -2 && dry(st, v)) { par[v] = u; via[v] = 0; q.push(v); }
-      const bl = adj.get(u);
-      if (bl) for (const v of bl) if (par[v] === -2) { par[v] = u; via[v] = 1; q.push(v); }
+      for (const v of n4(st, u)) if (par[v] === -2 && dry(st, v)) { par[v] = u; q.push(v); }
     }
     const segs = new Map();
     for (let c = 0; c < N * N; c++) {
@@ -308,7 +290,9 @@
       let u = c;
       while (par[u] >= 0) {
         const p = par[u];
-        if (via[u] === 0) { const k = u < p ? u + ':' + p : p + ':' + u; if (segs.has(k)) break; segs.set(k, [Math.min(u, p), Math.max(u, p)]); }
+        const k = u < p ? u + ':' + p : p + ':' + u;
+        if (segs.has(k)) break;
+        segs.set(k, [Math.min(u, p), Math.max(u, p)]);
         u = p;
       }
     }
@@ -359,7 +343,7 @@
   function applyTide(st) {
     st.W += st.rises[st.tide];
     const flooded = floodStep(st, st.W, st.flooded, -1);
-    const ev = { W: st.W, rise: st.rises[st.tide], flooded, lost: [], removed: [], drowned: [], broken: [], grow: [], shrink: [], abandon: [] };
+    const ev = { W: st.W, rise: st.rises[st.tide], flooded, lost: [], removed: [], drowned: [], grow: [], shrink: [], abandon: [] };
     for (const o of flooded) {
       const c = o.c, b = st.bld[c];
       if (b === B.VILLAGE) { st.lost += st.pop[c]; ev.lost.push({ c, n: st.pop[c], d: o.d }); st.pop[c] = 0; }
@@ -367,10 +351,6 @@
       if (b >= 0) st.bld[c] = -1;
       if (st.feature[c] !== F.NONE) { ev.drowned.push({ c, f: st.feature[c], d: o.d }); st.feature[c] = F.NONE; }
     }
-    st.bridges = st.bridges.filter((b) => {
-      if (st.flooded[b.a] || st.flooded[b.b]) { ev.broken.push(b); return false; }
-      return true;
-    });
     const conn = connectivity(st);
     for (let c = 0; c < st.N * st.N; c++) {
       if (st.bld[c] !== B.VILLAGE) continue;
@@ -418,8 +398,7 @@
   const daysToTide = (st) => st.days - (st.day % st.days);
 
   // ---------- Будівництво ----------
-  function costOf(tool, span) {
-    if (tool === 'bridge') return { wood: 1 + (span || 1), stone: 0 };
+  function costOf(tool) {
     return { wood: COST[tool].wood, stone: COST[tool].stone };
   }
   const afford = (st, cost) => st.wood >= cost.wood && st.stone >= cost.stone;
@@ -431,46 +410,11 @@
       if (st.height[c] < 1 || isBorder(st.N, c)) return { ok: false, why: 'deep' };
     }
     if (st.feature[c] === F.ROCK) return { ok: false, why: 'rock' };
-    if (underBridge(st, c)) return { ok: false, why: 'bridge' };
     const cost = costOf(tool);
     if (!afford(st, cost)) return { ok: false, why: cost.stone > st.stone ? 'stone' : 'wood', cost };
     return { ok: true, cost };
   }
-  function bridgeCheck(st, a, b) {
-    const N = st.N;
-    if (a === b || a < 0 || b < 0) return { ok: false, why: '' };
-    const ax = a % N, ay = (a / N) | 0, bx = b % N, by = (b / N) | 0;
-    if (ax !== bx && ay !== by) return { ok: false, why: 'line' };
-    const dist = Math.abs(ax - bx) + Math.abs(ay - by), span = dist - 1;
-    if (span < 1) return { ok: false, why: 'short' };
-    if (span > BRIDGE_MAX) return { ok: false, why: 'far' };
-    if (!dry(st, a) || !dry(st, b)) return { ok: false, why: 'water' };
-    const step = ax === bx ? (by > ay ? N : -N) : (bx > ax ? 1 : -1);
-    const mids = [];
-    const lo = Math.min(st.height[a], st.height[b]);
-    let wet = 0;
-    for (let m = a + step; m !== b; m += step) {
-      if (underBridge(st, m)) return { ok: false, why: 'cross' };
-      if (st.flooded[m]) { wet++; mids.push(m); continue; }
-      if (st.height[m] >= lo || st.bld[m] >= 0 || st.feature[m] === F.ROCK) return { ok: false, why: 'blocked' };
-      mids.push(m);
-    }
-    for (const br of st.bridges) if ((br.a === a && br.b === b) || (br.a === b && br.b === a)) return { ok: false, why: 'dup' };
-    const cost = costOf('bridge', span);
-    if (!afford(st, cost)) return { ok: false, why: 'wood', cost, mids, span };
-    return { ok: true, cost, mids, span, wet };
-  }
-  function build(st, tool, c, c2) {
-    if (tool === 'bridge') {
-      const r = bridgeCheck(st, c, c2);
-      if (!r.ok) return null;
-      st.wood -= r.cost.wood; st.stone -= r.cost.stone;
-      const cleared = [];
-      for (const m of r.mids) if (st.feature[m] === F.FOREST) { st.feature[m] = F.NONE; cleared.push(m); }
-      const br = { a: c, b: c2, mids: r.mids };
-      st.bridges.push(br); st.built++;
-      return { tool, bridge: br, cleared, drained: [] };
-    }
+  function build(st, tool, c) {
     const r = checkCell(st, tool, c);
     if (!r.ok) return null;
     st.wood -= r.cost.wood; st.stone -= r.cost.stone;
@@ -528,10 +472,10 @@
   function starsFor(st, score) { let n = 0; for (const g of st.goals) if (score >= g) n++; return n; }
 
   const Logic = {
-    MAXH, B, F, TOOLS, TOOL_B, COST, VMAX, BRIDGE_MAX, SAW_MAX, QUARRY_MAX, LEVELS,
-    rnd, hash2, n4, n8, isBorder, genMap, newLevel, clone, dry, shallow, underBridge, connectivity, roadTree,
+    MAXH, B, F, TOOLS, TOOL_B, COST, VMAX, SAW_MAX, QUARRY_MAX, LEVELS,
+    rnd, hash2, n4, n8, isBorder, genMap, newLevel, clone, dry, shallow, connectivity, roadTree,
     floodStep, drain, forecast, applyTide, around, output, income, endDay, daysToTide,
-    costOf, afford, checkCell, bridgeCheck, build, buildLine, liveScore, futureScore, nextTideRisk, starsFor,
+    costOf, afford, checkCell, build, buildLine, liveScore, futureScore, nextTideRisk, starsFor,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = Logic;
   else root.Logic = Logic;

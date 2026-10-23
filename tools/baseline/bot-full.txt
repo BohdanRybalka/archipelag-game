@@ -1,8 +1,8 @@
-#1 Тиха бухта         best=55 {"maxSaw":3,"maxQuarry":0,"reclaim":0} lost=6 left=1 recl=0 | noDam=55 noBridge=55 noProt=55 | {"saw":3,"village":14}
-#2 Перша дамба        best=60 {"maxSaw":4,"maxQuarry":1,"reclaim":6} lost=2 left=0 recl=19 | noDam=43 noBridge=60 noProt=43 | {"saw":4,"dams":2,"village":20,"quarry":1}
-#3 Перешийок          best=106 {"maxSaw":4,"maxQuarry":3,"reclaim":12} lost=0 left=0 recl=13 | noDam=24 noBridge=106 noProt=24 | {"saw":4,"dams":2,"quarry":3,"village":31}
-#4 Затока             best=96 {"maxSaw":3,"maxQuarry":3,"reclaim":12} lost=0 left=2 recl=35 | noDam=8 noBridge=96 noProt=8 | {"saw":3,"quarry":3,"village":23,"dams":3}
-#5 Три сестри         best=109 {"maxSaw":4,"maxQuarry":3,"reclaim":12} lost=2 left=3 recl=31 | noDam=12 noBridge=109 noProt=12 | {"saw":4,"quarry":3,"village":28,"dams":3}
-#6 Штормовий рік      best=107 {"maxSaw":4,"maxQuarry":3,"reclaim":12} lost=7 left=2 recl=19 | noDam=0 noBridge=107 noProt=0 | {"saw":4,"quarry":3,"dams":3,"village":29}
-#7 Мілини             best=83 {"maxSaw":4,"maxQuarry":2,"reclaim":6} lost=5 left=3 recl=18 | noDam=32 noBridge=83 noProt=32 | {"saw":4,"village":26,"dams":5,"quarry":2}
-#8 Високий берег      best=157 {"maxSaw":4,"maxQuarry":2,"reclaim":6} lost=6 left=2 recl=49 | noDam=0 noBridge=157 noProt=0 | {"saw":4,"quarry":2,"dams":9,"village":37}
+#1 Тиха бухта         best=55 {"maxSaw":3,"maxQuarry":0,"reclaim":0} lost=6 left=1 recl=0 | noDam=55 | {"saw":3,"village":14}
+#2 Перша дамба        best=60 {"maxSaw":4,"maxQuarry":1,"reclaim":6} lost=2 left=0 recl=19 | noDam=43 | {"saw":4,"dams":2,"village":20,"quarry":1}
+#3 Перешийок          best=106 {"maxSaw":4,"maxQuarry":3,"reclaim":12} lost=0 left=0 recl=13 | noDam=24 | {"saw":4,"dams":2,"quarry":3,"village":31}
+#4 Затока             best=96 {"maxSaw":3,"maxQuarry":3,"reclaim":12} lost=0 left=2 recl=35 | noDam=8 | {"saw":3,"quarry":3,"village":23,"dams":3}
+#5 Три сестри         best=109 {"maxSaw":4,"maxQuarry":3,"reclaim":12} lost=2 left=3 recl=31 | noDam=12 | {"saw":4,"quarry":3,"village":28,"dams":3}
+#6 Штормовий рік      best=107 {"maxSaw":4,"maxQuarry":3,"reclaim":12} lost=7 left=2 recl=19 | noDam=0 | {"saw":4,"quarry":3,"dams":3,"village":29}
+#7 Мілини             best=83 {"maxSaw":4,"maxQuarry":2,"reclaim":6} lost=5 left=3 recl=18 | noDam=32 | {"saw":4,"village":26,"dams":5,"quarry":2}
+#8 Високий берег      best=157 {"maxSaw":4,"maxQuarry":2,"reclaim":6} lost=6 left=2 recl=49 | noDam=0 | {"saw":4,"quarry":2,"dams":9,"village":37}

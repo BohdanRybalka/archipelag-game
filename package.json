@@ -1,0 +1,20 @@
+{
+  "name": "archipelag-game",
+  "private": true,
+  "description": "Архіпелаг: браузерна гра про дамби й море, що піднімається",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node tools/build.js",
+    "check:build": "node tools/check-build.js",
+    "check:logic": "node tools/check-logic.js",
+    "check:ui": "node tools/check-ui.js",
+    "check": "npm run check:build && npm run check:logic && npm run check:ui"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0",
+    "three": "0.128.0"
+  }
+}

@@ -1,0 +1,161 @@
+<title>Архіпелаг</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap">
+<style>
+/*__CSS__*/
+</style>
+<div id="app">
+  <canvas id="scene" aria-label="Ігрове поле: острів на квадратній сітці"></canvas>
+  <div id="chips" aria-hidden="true"></div>
+
+  <div id="hud" hidden>
+    <header id="topbar">
+      <section class="lvlbox">
+        <div class="eyebrow" id="lvl-eyebrow"></div>
+        <div class="lvl-name" id="lvl-name"></div>
+      </section>
+      <section class="tl" id="timeline" aria-label="Дні та припливи"></section>
+      <section class="scorebox" id="scorebox">
+        <div class="score-row">
+          <svg class="ico" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="12" cy="7.2" r="3.7"/><path d="M4.3 20.6c.6-4.4 3.7-7.2 7.7-7.2s7.1 2.8 7.7 7.2z"/></svg>
+          <div class="score" id="score" aria-label="Жителі">0</div>
+        </div>
+        <div class="goalbar"><div class="goal-fill" id="goal-fill"></div><div class="goal-marks" id="goal-marks"></div></div>
+        <div class="cut-line" id="cut-line" hidden></div>
+        <div class="res">
+          <div class="res-pill" id="res-wood" title="Дерево: є / приріст за день"></div>
+          <div class="res-pill" id="res-stone" title="Камінь: є / приріст за день"></div>
+        </div>
+      </section>
+    </header>
+
+    <nav class="tools" aria-label="Вигляд">
+      <button type="button" id="btn-rot-l" class="tool" title="Повернути ліворуч (Q)" aria-label="Повернути острів ліворуч">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4.5h4.5"/></svg>
+      </button>
+      <button type="button" id="btn-rot-r" class="tool" title="Повернути праворуч (E)" aria-label="Повернути острів праворуч">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.5h-4.5"/></svg>
+      </button>
+      <button type="button" id="btn-map" class="tool" title="Коли заллє кожну клітинку (M)" aria-label="Мапа припливів" aria-pressed="false">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 5l9 4.5-9 4.5z"/><path d="m3 14 9 4.5 9-4.5"/></svg>
+      </button>
+      <button type="button" id="btn-sound" class="tool" title="Звук" aria-label="Звук" aria-pressed="true">
+        <svg class="s-on" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+        <svg class="s-off" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></svg>
+      </button>
+      <button type="button" id="btn-help" class="tool" title="Правила і меню" aria-label="Правила і меню">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </nav>
+
+    <footer id="bottombar">
+      <button type="button" id="undo" class="undo" title="Скасувати останнє будівництво (Z)" aria-label="Скасувати" disabled>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6 4 11l5 5"/><path d="M4 11h10a6 6 0 0 1 0 12h-2" transform="translate(0 -3)"/></svg>
+      </button>
+      <div id="toolbar" class="toolbar" role="toolbar" aria-label="Будівництво"></div>
+      <button type="button" id="next" class="next"><span>Далі</span></button>
+    </footer>
+  </div>
+
+  <div id="banner" class="banner" role="status" aria-live="polite"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="intro" class="intro" hidden></div>
+  <div id="hint" class="hint" role="status" hidden>
+    <span id="hint-text"></span>
+    <button type="button" id="hint-ok" class="hint-ok" aria-label="Сховати підказку">×</button>
+  </div>
+
+  <div id="screen-start" class="screen start" hidden>
+    <div id="start-panel" class="panel start-panel">
+      <div class="logo">
+        <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true">
+          <rect x="2" y="2" width="44" height="44" rx="13" fill="#1E2328"/>
+          <rect x="8" y="22" width="11" height="11" rx="3" fill="#2F5FD0"/>
+          <rect x="29" y="14" width="11" height="11" rx="3" fill="#E2483D"/>
+          <path d="M19 27.5h4.5a3 3 0 0 0 3-3v-2a3 3 0 0 1 3-3" fill="none" stroke="#0E9E8C" stroke-width="3" stroke-linecap="round"/>
+          <path d="M8 39c2.6 0 2.6-2.4 5.2-2.4s2.6 2.4 5.2 2.4 2.6-2.4 5.2-2.4 2.6 2.4 5.2 2.4 2.6-2.4 5.2-2.4 2.6 2.4 5.2 2.4" fill="none" stroke="#5FA2B3" stroke-width="2.6" stroke-linecap="round"/>
+        </svg>
+        <span>Архіпелаг</span>
+      </div>
+      <p class="tagline">Море щосезону піднімається й забирає землю. Відгороджуй його дамбами, відвойовуй мілину й тримай громаду разом.</p>
+
+      <div class="lvl-line" id="lvl-line">
+        <div class="lvl-track" aria-hidden="true"></div>
+        <div class="level-map" id="level-map"></div>
+      </div>
+
+      <div class="menu-lvl">
+        <div class="eyebrow" id="menu-lvl-num"></div>
+        <div class="menu-lvl-name" id="menu-lvl-name"></div>
+        <p id="menu-lvl-desc"></p>
+        <div class="menu-lvl-best" id="menu-lvl-best"></div>
+      </div>
+
+      <div class="btn-col">
+        <button type="button" id="btn-play" class="btn primary">Грати</button>
+        <div class="btn-row">
+          <button type="button" id="btn-restart-lvl" class="btn ghost" hidden>Почати рівень заново</button>
+          <button type="button" id="btn-how" class="btn ghost">Як грати</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-help" class="screen modal" hidden>
+    <div class="panel help-panel" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <div class="help-head">
+        <h2 id="help-title">Як грати</h2>
+        <button type="button" id="btn-help-close" class="tool flat" aria-label="Закрити">×</button>
+      </div>
+      <div class="help-body">
+        <ol class="rules">
+          <li>Щодня будуй що хочеш, поки вистачає <b>дерева</b> і <b>каменю</b>. Потім тисни «Далі».</li>
+          <li>Кожні три дні приходить <b>приплив</b>: вода піднімається на уступ і заходить із моря через сторони клітинок. Що опинилось під водою, зникає разом із людьми.</li>
+          <li><b>Дамба</b> не тоне й не пускає воду. Її можна ставити й на мілину, вона світліша за глибину. Замкни ділянку дамбами, і вода з неї стече: з’явиться нова суша.</li>
+          <li>Селища, до яких веде <b>дорога від міста</b>, після припливу ростуть. Відрізані порожніють. Дамба теж працює як дорога.</li>
+          <li>Наприкінці рахуються всі жителі. Одна зірка відкриває наступний рівень.</li>
+        </ol>
+        <h3>Будівлі</h3>
+        <div class="help-tools" id="help-tools"></div>
+        <h3>Керування</h3>
+        <ul class="keys">
+          <li><kbd>1</kbd>…<kbd>4</kbd> обрати будівлю</li>
+          <li>Дамбу можна протягнути мишею або пальцем по клітинках</li>
+          <li><kbd>Пробіл</kbd> наступний день</li>
+          <li><kbd>Z</kbd> скасувати</li>
+          <li><kbd>Q</kbd><kbd>E</kbd> повернути острів</li>
+          <li><kbd>M</kbd> коли заллє кожну клітинку</li>
+          <li><kbd>Esc</kbd> або права кнопка: скасувати вибір</li>
+          <li>Колесо або два пальці: масштаб</li>
+          <li>На телефоні торкнись клітинки двічі, щоб збудувати</li>
+        </ul>
+      </div>
+      <div class="help-foot" id="help-ingame" hidden>
+        <button type="button" id="btn-restart" class="btn ghost">Почати рівень заново</button>
+        <button type="button" id="btn-quit" class="btn ghost">До рівнів</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-result" class="screen modal" hidden>
+    <div class="panel result-panel" role="dialog" aria-modal="true" aria-labelledby="res-title">
+      <div class="eyebrow" id="res-eyebrow"></div>
+      <h2 id="res-title"></h2>
+      <div class="res-stars" id="res-stars"></div>
+      <p id="res-sub" class="res-sub"></p>
+      <div class="res-table" id="res-table"></div>
+      <div id="res-actions" class="btn-row"></div>
+    </div>
+  </div>
+
+  <div class="no-webgl-msg">Цій грі потрібен WebGL. Відкрий її в сучасному браузері з увімкненим апаратним прискоренням.</div>
+</div>
+<!--__THREE__-->
+<script>
+/*__LOGIC__*/
+</script>
+<script>
+/*__GAME__*/
+</script>

@@ -1,0 +1,2439 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Приплив</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap">
+<style>
+/* Діорама на настільному полі: острів у центрі, HUD як легенда транспортної мапи по краях. */
+:root {
+  /* Колір */
+  --bg: #E2E6DC;
+  --paper: #FBFAF7;
+  --paper-2: #F0EFEA;
+  --ink: #1E2328;
+  --ink-2: #555D65;
+  --ink-3: #8A9097;
+  --line: rgba(30, 35, 40, 0.1);
+  --line-2: rgba(30, 35, 40, 0.2);
+  --house: #2F5FD0;
+  --fish: #0E9E8C;
+  --saw: #EE9F2E;
+  --market: #E2483D;
+  --light: #7A5AD3;
+  --wall: #8F8B83;
+  --water: #2E7E92;
+  --water-soft: #D9ECF0;
+  --gold: #E8A317;
+  --danger: #D9443A;
+  /* Шрифти */
+  --f-display: 'Unbounded', 'Arial Black', system-ui, sans-serif;
+  --f-ui: 'Onest', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Інше */
+  --sh-1: 0 1px 2px rgba(30, 35, 40, 0.08), 0 8px 22px -12px rgba(30, 35, 40, 0.35);
+  --sh-2: 0 2px 6px rgba(30, 35, 40, 0.08), 0 24px 48px -20px rgba(30, 35, 40, 0.45);
+  --spring: cubic-bezier(0.2, 1.45, 0.4, 1);
+  --top-h: 120px;
+  color-scheme: light;
+}
+
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-ui);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; }
+button:focus-visible, .card:focus-visible { outline: 3px solid var(--house); outline-offset: 3px; }
+
+#app { position: fixed; inset: 0; overflow: hidden; }
+#scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+body.has-sel #scene { cursor: crosshair; }
+#links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 2; }
+#chips { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+
+.eyebrow { font: 600 10.5px/1.3 var(--f-ui); letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); }
+
+/* ---------- HUD ---------- */
+#hud { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+#topbar {
+  position: absolute; top: 0; left: 0; right: 0;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px) minmax(0, 1fr);
+  grid-template-areas: "isl tl score"; gap: 16px; align-items: start;
+}
+#topbar > section { pointer-events: auto; min-width: 0; }
+.isl { grid-area: isl; padding-top: 4px; }
+.isl-name { font: 600 24px/1.1 var(--f-display); letter-spacing: -0.01em; margin-top: 4px; text-wrap: balance; }
+.perk-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.perk-chip { font: 600 11px/1 var(--f-ui); padding: 5px 9px; border-radius: 99px; background: var(--paper); box-shadow: 0 0 0 1px var(--line-2); color: var(--ink-2); }
+
+.tl { grid-area: tl; width: 100%; justify-self: center; padding-top: 8px; }
+.tl svg { width: 100%; height: auto; display: block; overflow: visible; }
+.tl-base { stroke: rgba(30, 35, 40, 0.13); stroke-width: 4; stroke-linecap: round; }
+.tl-done { stroke: var(--ink); stroke-width: 4; stroke-linecap: round; }
+.tl-stop.past { fill: var(--ink); }
+.tl-stop.future { fill: var(--paper); stroke: rgba(30, 35, 40, 0.32); stroke-width: 1.4; }
+.tl-stop.now { fill: var(--paper); stroke: var(--ink); stroke-width: 2.6; }
+.tl-tide circle { fill: var(--paper); stroke: var(--water); stroke-width: 2; }
+.tl-tide path { fill: none; stroke: var(--water); stroke-width: 1.7; stroke-linecap: round; }
+.tl-tide.done circle { fill: var(--water); }
+.tl-tide.done path { stroke: #fff; }
+.tl-tide.next circle { stroke-width: 2.6; }
+.tl-label { font: 600 9px var(--f-ui); fill: var(--ink-3); text-anchor: middle; letter-spacing: 0.08em; text-transform: uppercase; }
+.tl-label.cur { fill: var(--ink); }
+
+.scorebox { grid-area: score; justify-self: end; width: 232px; padding: 12px 14px 12px; border-radius: 16px; background: var(--paper); box-shadow: var(--sh-1); }
+.score { font: 600 34px/1 var(--f-display); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; margin: 5px 0 12px; display: inline-block; transform-origin: left center; }
+.score.bump { animation: bump 0.5s var(--spring); }
+.goalbar { position: relative; height: 8px; border-radius: 99px; background: var(--paper-2); box-shadow: inset 0 0 0 1px var(--line); margin: 0 8px; }
+.goal-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: var(--ink); width: 0; }
+.goal-marks .gm { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 20px; height: 20px; border-radius: 50%; background: var(--paper); display: grid; place-items: center; color: var(--ink-3); box-shadow: 0 0 0 1.5px var(--line-2); transition: background 0.2s, color 0.2s; }
+.goal-marks .gm.on { color: #fff; background: var(--gold); box-shadow: 0 0 0 2px var(--paper); animation: pop 0.55s var(--spring); }
+.goal-legend { display: flex; justify-content: space-between; gap: 6px; margin-top: 12px; font: 600 11px/1 var(--f-ui); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.goal-legend .on { color: var(--ink); }
+.run-line { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font: 500 11px/1.2 var(--f-ui); color: var(--ink-3); }
+
+.tools { position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); top: calc(var(--top-h) + 10px); display: flex; flex-direction: column; gap: 8px; pointer-events: auto; }
+.tool { width: 40px; height: 40px; border-radius: 12px; border: 0; background: var(--paper); color: var(--ink); box-shadow: var(--sh-1); display: grid; place-items: center; cursor: pointer; transition: transform 0.3s var(--spring), background 0.2s, color 0.2s; }
+.tool:hover { transform: translateY(-2px); }
+.tool:active { transform: scale(0.92); }
+.tool.on { background: var(--ink); color: var(--paper); }
+.tool .s-off { display: none; }
+.tool.off .s-on { display: none; }
+.tool.off .s-off { display: block; }
+
+#handwrap {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: "tide hand reroll"; gap: 14px; align-items: end;
+  min-height: 186px;
+}
+.tide-chip { grid-area: tide; justify-self: start; display: flex; align-items: center; gap: 10px; padding: 9px 14px 9px 9px; border-radius: 14px; background: var(--paper); box-shadow: var(--sh-1); pointer-events: auto; max-width: 300px; }
+.tc-ico { flex: none; width: 34px; height: 34px; border-radius: 10px; background: var(--water-soft); color: var(--water); display: grid; place-items: center; }
+.tc-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tc-txt b { font: 600 13px/1.25 var(--f-ui); }
+.tc-txt span { font: 500 12px/1.3 var(--f-ui); color: var(--ink-2); }
+.tide-chip.urgent .tc-ico { background: var(--water); color: #fff; animation: pulse 1.5s ease-in-out infinite; }
+
+.hand { grid-area: hand; display: flex; gap: 12px; align-items: flex-end; pointer-events: auto; min-height: 150px; }
+.card {
+  --c: #333;
+  position: relative; width: 190px; padding: 12px 12px 14px; border-radius: 16px;
+  background: var(--paper); border: 1.5px solid rgba(30, 35, 40, 0.07); box-shadow: var(--sh-1);
+  text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 9px;
+  transition: transform 0.4s var(--spring), box-shadow 0.25s, border-color 0.2s, opacity 0.2s;
+}
+.card:hover { transform: translateY(-5px); }
+.card.is-sel { transform: translateY(-16px); border-color: var(--c); box-shadow: 0 0 0 3px rgba(30, 35, 40, 0.06), var(--sh-2); }
+.card.deal { animation: deal 0.6s var(--spring) backwards; animation-delay: var(--d, 0ms); }
+.hand.locked .card { pointer-events: none; opacity: 0.55; }
+.card-head { display: flex; align-items: center; gap: 10px; }
+.card-ico { flex: none; width: 34px; height: 34px; border-radius: 11px; background: var(--c); display: grid; place-items: center; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.12); }
+.card-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.card-name { font: 700 15px/1.1 var(--f-ui); }
+.card-sub { font: 500 11px/1.2 var(--f-ui); color: var(--ink-3); }
+.rgrid { flex: none; }
+.rgrid .o { fill: rgba(30, 35, 40, 0.08); }
+.rgrid .r { fill: var(--c); opacity: 0.35; }
+.rgrid .c { fill: var(--c); }
+.card-rules { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.card-rules li { display: grid; grid-template-columns: 24px 13px minmax(0, 1fr); align-items: center; gap: 5px; font: 500 12px/1.25 var(--f-ui); color: var(--ink-2); }
+.card-rules b { font: 700 12.5px/1 var(--f-ui); color: var(--ink); font-variant-numeric: tabular-nums; }
+.card-rules li.neg b { color: var(--danger); }
+.card-rules li.muted { opacity: 0.6; }
+.card-rules .ico { display: block; }
+
+.reroll { grid-area: reroll; justify-self: start; align-self: center; display: inline-flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; border: 1.5px dashed rgba(30, 35, 40, 0.28); background: rgba(251, 250, 247, 0.75); font: 600 13px/1 var(--f-ui); cursor: pointer; pointer-events: auto; transition: transform 0.3s var(--spring), background 0.2s; }
+.reroll:hover:not(:disabled) { transform: translateY(-2px); background: var(--paper); }
+.reroll:disabled { opacity: 0.4; cursor: default; }
+.badge { min-width: 20px; height: 20px; padding: 0 5px; border-radius: 99px; background: var(--ink); color: var(--paper); font: 700 11px/20px var(--f-ui); text-align: center; }
+
+/* ---------- Фішки над полем ---------- */
+.pin { position: absolute; left: 0; top: 0; will-change: transform; }
+.chip {
+  translate: -50% -100%; display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 7px 2px 5px; border-radius: 999px; background: var(--paper); color: var(--ink);
+  font: 700 11.5px/1.25 var(--f-ui); font-variant-numeric: tabular-nums; white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(30, 35, 40, 0.14), 0 6px 14px -6px rgba(30, 35, 40, 0.35);
+  animation: chipIn 0.34s var(--spring) both;
+}
+.chip i { width: 7px; height: 7px; border-radius: 50%; display: block; }
+.chip.neg { color: var(--danger); }
+.chip.total { flex-direction: column; gap: 3px; padding: 7px 12px 8px; border-radius: 14px; background: var(--ink); color: var(--paper); text-align: center; z-index: 2; white-space: normal; width: max-content; max-width: 200px; }
+.chip.total b { font: 600 20px/1 var(--f-display); letter-spacing: -0.01em; }
+.chip.total span { font: 500 11px/1.4 var(--f-ui); opacity: 0.78; }
+.chip.total em { font: 600 10.5px/1.3 var(--f-ui); font-style: normal; color: #9FD3DE; }
+.chip.total.is-neg b { color: #FF9F96; }
+.chip.info { flex-direction: column; align-items: flex-start; gap: 2px; padding: 6px 10px; border-radius: 10px; }
+.chip.info span { font: 500 11.5px/1.3 var(--f-ui); color: var(--ink-2); }
+.chip.warn { background: var(--danger); color: #fff; font-weight: 600; }
+.chip.float { animation: floatUp 0.95s ease-out both; }
+.chip.harvest { background: var(--gold); color: var(--ink); }
+.chip.lost { background: var(--water); color: #fff; font-weight: 600; }
+.chip.mapnum { translate: -50% -50%; min-width: 20px; justify-content: center; padding: 2px 6px; background: rgba(251, 250, 247, 0.94); color: var(--water); font-size: 11px; }
+.chip.mapnum.k1 { background: var(--water); color: #fff; }
+#links .lk { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: 0.8; }
+#links .lk.neg { stroke-dasharray: 4 5; }
+#links .lk-end { stroke: var(--paper); stroke-width: 1.5; }
+#links .lk-hub { fill: var(--ink); stroke: var(--paper); stroke-width: 2; }
+
+.flyer { position: fixed; left: 0; top: 0; z-index: 30; padding: 6px 12px; border-radius: 999px; background: var(--ink); color: var(--paper); font: 600 18px/1 var(--f-display); pointer-events: none; box-shadow: var(--sh-1); }
+.flyer.neg { background: var(--danger); }
+
+/* ---------- Банер, інтро, навчання ---------- */
+.banner {
+  position: absolute; left: 50%; top: calc(var(--top-h) + 10px); z-index: 12;
+  display: flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px;
+  background: var(--ink); color: var(--paper); font: 500 13px/1.2 var(--f-ui); white-space: nowrap;
+  pointer-events: none; opacity: 0; transform: translate(-50%, -12px) scale(0.94);
+  transition: opacity 0.25s, transform 0.45s var(--spring); box-shadow: var(--sh-2); max-width: calc(100vw - 32px);
+}
+.banner.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+.banner b { font-weight: 700; }
+.banner span { opacity: 0.75; }
+.banner.tide { background: var(--water); }
+.banner.harvest { background: var(--gold); color: var(--ink); }
+.banner .ico { flex: none; }
+
+.intro {
+  position: absolute; left: 50%; top: calc(var(--top-h) + 18px); z-index: 11;
+  width: min(400px, calc(100vw - 32px)); padding: 16px 20px 16px; border-radius: 18px;
+  background: rgba(251, 250, 247, 0.95); box-shadow: var(--sh-2); text-align: center; pointer-events: none;
+  transform: translateX(-50%);
+}
+.intro.show { animation: introIn 0.65s var(--spring) both; }
+.intro.out { animation: introOut 0.35s ease both; }
+.intro-name { font: 700 30px/1.1 var(--f-display); letter-spacing: -0.01em; margin: 6px 0 8px; text-wrap: balance; }
+.intro p { margin: 0 auto 12px; max-width: 34ch; font: 500 13.5px/1.5 var(--f-ui); color: var(--ink-2); }
+.intro-goals { display: flex; justify-content: center; gap: 14px; font: 600 12px/1 var(--f-ui); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+.coach {
+  position: absolute; left: 0; top: 0; z-index: 15; width: min(320px, calc(100vw - 24px));
+  padding: 14px 16px 12px; border-radius: 14px; background: var(--ink); color: var(--paper);
+  box-shadow: var(--sh-2); font: 500 13.5px/1.5 var(--f-ui); animation: fadeIn 0.35s ease both;
+}
+.coach p { margin: 0 0 10px; }
+.coach::after { content: ""; position: absolute; left: var(--ax, 50%); width: 14px; height: 14px; background: var(--ink); transform: translateX(-50%) rotate(45deg); border-radius: 3px; }
+.coach[data-side="top"]::after { bottom: -6px; }
+.coach[data-side="bottom"]::after { top: -6px; }
+.coach[data-side="mid"]::after { display: none; }
+
+/* ---------- Кнопки ---------- */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 20px; border-radius: 13px; border: 0; font: 600 15px/1.2 var(--f-ui); cursor: pointer; transition: transform 0.3s var(--spring), background 0.2s, box-shadow 0.2s; }
+.btn:hover { transform: translateY(-2px); }
+.btn:active { transform: scale(0.97); }
+.btn.primary { background: var(--ink); color: var(--paper); box-shadow: 0 10px 22px -12px rgba(30, 35, 40, 0.7); }
+.btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line-2); }
+.btn.ghost:hover { background: var(--paper-2); }
+.btn.link { background: none; color: var(--ink-2); padding: 8px; text-decoration: underline; text-underline-offset: 3px; }
+.btn.small { padding: 7px 12px; font-size: 13px; border-radius: 10px; background: var(--paper); color: var(--ink); }
+#btn-continue { flex-direction: column; gap: 3px; }
+#btn-continue small { font: 500 12px/1.2 var(--f-ui); color: var(--ink-3); }
+
+/* ---------- Екрани ---------- */
+.screen { position: absolute; inset: 0; z-index: 20; display: flex; }
+.panel { background: var(--paper); border-radius: 22px; box-shadow: var(--sh-2); }
+.screen.start {
+  align-items: center; pointer-events: none;
+  padding-block: 24px;
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
+}
+.start-panel { pointer-events: auto; width: min(430px, 100%); padding: 30px 30px 24px; animation: panelIn 0.8s var(--spring) both; max-height: 100%; overflow: auto; }
+.logo { display: flex; align-items: center; gap: 14px; font: 700 clamp(36px, 4.6vw, 52px)/1 var(--f-display); letter-spacing: -0.02em; }
+.logo svg { flex: none; }
+.tagline { font: 600 16px/1.4 var(--f-ui); margin: 16px 0 8px; text-wrap: balance; }
+.lore { font: 400 14px/1.6 var(--f-ui); color: var(--ink-2); margin: 0 0 20px; max-width: 60ch; }
+.legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px 12px; margin: 0 0 24px; padding: 14px 0 0; border-top: 1px solid var(--line); }
+.legend span { display: flex; align-items: center; gap: 8px; font: 600 12px/1 var(--f-ui); color: var(--ink-2); }
+.legend i { flex: none; width: 20px; height: 6px; border-radius: 3px; background: var(--c); }
+.btn-col { display: flex; flex-direction: column; gap: 10px; }
+.best { margin-top: 16px; font: 500 12px/1.4 var(--f-ui); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+.screen.modal {
+  align-items: center; justify-content: center; overflow: auto;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: rgba(30, 35, 40, 0.34); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+.screen.modal.in { animation: fadeIn 0.3s ease both; }
+.screen.modal.in .panel { animation: panelIn 0.55s var(--spring) both; }
+.help-panel { width: min(780px, 100%); max-height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.help-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 24px 8px; }
+.help-head h2 { margin: 0; font: 700 24px/1.1 var(--f-display); }
+.help-head .tool { box-shadow: inset 0 0 0 1.5px var(--line-2); font: 500 22px/1 var(--f-ui); }
+.help-body { padding: 4px 24px 22px; overflow: auto; -webkit-user-select: text; user-select: text; }
+.help-body h3 { font: 600 11px/1.2 var(--f-ui); letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); margin: 22px 0 10px; }
+.rules { margin: 8px 0 0; padding: 0 0 0 20px; display: flex; flex-direction: column; gap: 9px; font: 400 14px/1.55 var(--f-ui); color: var(--ink-2); max-width: 70ch; }
+.rules b { color: var(--ink); }
+.rules li::marker { font-weight: 700; color: var(--ink); }
+.help-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.card.mini { width: auto; cursor: default; box-shadow: none; border: 1.5px solid var(--line); }
+.card.mini:hover { transform: none; }
+.keys { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 18px; font: 500 13px/1.4 var(--f-ui); color: var(--ink-2); }
+.keys kbd { display: inline-block; min-width: 20px; padding: 2px 6px; margin-right: 4px; border-radius: 6px; background: var(--paper-2); box-shadow: inset 0 -1px 0 var(--line-2), 0 0 0 1px var(--line); font: 600 11.5px/1.3 var(--f-ui); color: var(--ink); text-align: center; }
+.help-foot { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; padding: 14px 24px 18px; border-top: 1px solid var(--line); }
+
+.result-panel { width: min(620px, 100%); padding: 26px 26px 22px; text-align: center; max-height: 100%; overflow: auto; }
+#res-title { font: 700 clamp(22px, 4vw, 30px)/1.15 var(--f-display); letter-spacing: -0.01em; margin: 8px 0 14px; text-wrap: balance; }
+.res-stars { display: flex; justify-content: center; gap: 10px; color: rgba(30, 35, 40, 0.13); margin-bottom: 12px; }
+.rs { display: block; }
+.rs.on { color: var(--gold); }
+.rs.pop { animation: starPop 0.65s var(--spring) both; animation-delay: var(--d); }
+.res-sub { font: 500 14px/1.55 var(--f-ui); color: var(--ink-2); max-width: 48ch; margin: 0 auto 18px; text-wrap: balance; }
+.res-table, .run-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0 0 18px; }
+.res-table > div, .run-sum > div { padding: 10px 8px; border-radius: 12px; background: var(--paper-2); display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.res-table span, .run-sum span { font: 500 11px/1.2 var(--f-ui); color: var(--ink-3); }
+.res-table b, .run-sum b { font: 600 18px/1.1 var(--f-display); font-variant-numeric: tabular-nums; }
+.res-table .sum { background: var(--ink); }
+.res-table .sum span { color: rgba(251, 250, 247, 0.7); }
+.res-table .sum b { color: var(--paper); }
+.res-table .goals { grid-column: 1 / -1; flex-direction: row; justify-content: center; gap: 18px; background: none; padding: 0; font: 600 12px/1 var(--f-ui); color: var(--ink-3); }
+.res-table .goals span { font: inherit; color: inherit; }
+.res-table .goals .on { color: var(--ink); }
+.res-perks[hidden] { display: none; }
+.perk-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.perk { text-align: left; padding: 14px; border-radius: 16px; background: var(--paper); border: 1.5px solid var(--line-2); cursor: pointer; display: flex; flex-direction: column; gap: 7px; transition: transform 0.35s var(--spring), border-color 0.2s, box-shadow 0.2s; animation: deal 0.6s var(--spring) backwards; }
+.perk:nth-child(2) { animation-delay: 80ms; }
+.perk:nth-child(3) { animation-delay: 160ms; }
+.perk:hover, .perk:focus-visible { transform: translateY(-4px); border-color: var(--c); box-shadow: var(--sh-1); }
+.perk-ico { width: 32px; height: 32px; border-radius: 10px; background: var(--c); display: grid; place-items: center; }
+.perk-name { font: 700 14px/1.2 var(--f-ui); }
+.perk-desc { font: 500 12.5px/1.45 var(--f-ui); color: var(--ink-2); }
+.btn-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+.no-webgl-msg { display: none; }
+body.no-webgl .no-webgl-msg { display: grid; place-items: center; position: absolute; inset: 0; padding: 24px; text-align: center; font: 500 16px/1.5 var(--f-ui); color: var(--ink); }
+
+.shake { animation: shake 0.42s ease; }
+
+/* ---------- Анімації ---------- */
+@keyframes deal { from { opacity: 0; transform: translateY(48px) rotate(5deg) scale(0.92); } to { opacity: 1; transform: none; } }
+@keyframes chipIn { from { scale: 0.4; opacity: 0; } to { scale: 1; opacity: 1; } }
+@keyframes floatUp { 0% { scale: 0.5; opacity: 0; translate: -50% -60%; } 22% { scale: 1.1; opacity: 1; translate: -50% -120%; } 100% { scale: 1; opacity: 0; translate: -50% -280%; } }
+@keyframes bump { 0% { transform: scale(1); } 35% { transform: scale(1.14); } 100% { transform: scale(1); } }
+@keyframes pop { 0% { transform: translate(-50%, -50%) scale(0.6); } 60% { transform: translate(-50%, -50%) scale(1.25); } 100% { transform: translate(-50%, -50%) scale(1); } }
+@keyframes starPop { 0% { transform: scale(0.2) rotate(-30deg); color: rgba(30, 35, 40, 0.13); } 60% { transform: scale(1.25) rotate(8deg); } 100% { transform: scale(1) rotate(0); } }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(46, 126, 146, 0.45); } 50% { box-shadow: 0 0 0 7px rgba(46, 126, 146, 0); } }
+@keyframes introIn { from { opacity: 0; transform: translate(-50%, -16px) scale(0.94); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+@keyframes introOut { to { opacity: 0; transform: translate(-50%, -10px) scale(0.97); } }
+@keyframes panelIn { from { opacity: 0; transform: translateY(18px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+
+/* ---------- Адаптивність ---------- */
+@media (max-width: 960px) {
+  #topbar { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "isl score" "tl tl"; row-gap: 6px; }
+  .tl { max-width: 500px; padding-top: 0; }
+  .scorebox { width: 200px; padding: 10px 12px; }
+  .score { font-size: 28px; margin: 4px 0 10px; }
+}
+@media (max-width: 760px) {
+  #handwrap { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "tide reroll" "hand hand"; gap: 10px; min-height: 0; }
+  .hand { justify-content: center; min-height: 0; gap: 8px; }
+  .tide-chip { padding: 6px 10px 6px 6px; gap: 8px; }
+  .tc-ico { width: 28px; height: 28px; border-radius: 8px; }
+  .tc-txt b { font-size: 12px; }
+  .tc-txt span { font-size: 11px; }
+  .reroll { align-self: end; padding: 8px 10px; }
+  .card { width: calc((100vw - 48px) / 3); max-width: 190px; padding: 9px 9px 10px; gap: 7px; border-radius: 14px; }
+  .card.is-sel { transform: translateY(-10px); }
+  .card-ico { width: 28px; height: 28px; border-radius: 9px; }
+  .card-name { font-size: 13px; }
+  .card-sub { font-size: 10px; }
+  .card-head { gap: 7px; }
+  .card-rules li { grid-template-columns: 20px 12px minmax(0, 1fr); gap: 4px; font-size: 10.5px; }
+  .card-rules b { font-size: 11px; }
+  .rgrid { display: none; }
+  .hand { min-height: 150px; }
+  .chip.total { max-width: 150px; padding: 6px 10px 7px; }
+  .chip.total b { font-size: 17px; }
+  .chip.total span, .chip.total em { font-size: 10px; }
+  .tools { gap: 6px; }
+  .tool { width: 36px; height: 36px; border-radius: 11px; }
+  .isl-name { font-size: 19px; }
+  .run-line { display: none; }
+  .screen.start { align-items: flex-end; padding-block: 12px calc(env(safe-area-inset-bottom, 0px) + 12px); }
+  .start-panel { width: 100%; padding: 20px 20px 16px; }
+  .lore { font-size: 13px; margin-bottom: 14px; }
+  .legend { margin-bottom: 16px; }
+  .perk-grid { grid-template-columns: minmax(0, 1fr); }
+  .res-table, .run-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .banner { font-size: 12px; white-space: normal; }
+}
+@media (max-width: 859px) and (min-width: 761px) {
+  .screen.start { align-items: flex-end; }
+  .start-panel { width: 100%; }
+}
+@media (max-width: 760px) and (max-height: 760px) {
+  .lore { display: none; }
+}
+@media (max-width: 420px) {
+  .scorebox { width: 156px; }
+  .goal-legend { font-size: 10px; }
+  .card-rules li { grid-template-columns: 20px minmax(0, 1fr); }
+  .card-rules .ico { display: none; }
+  .tide-chip { max-width: 220px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0ms !important; transition-duration: 0.01ms !important; }
+}
+
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene" aria-label="Ігрове поле: острів на сітці 11 на 11 клітинок"></canvas>
+  <svg id="links" aria-hidden="true"></svg>
+  <div id="chips" aria-hidden="true"></div>
+
+  <div id="hud" hidden>
+    <header id="topbar">
+      <section class="isl">
+        <div class="eyebrow" id="isl-eyebrow"></div>
+        <div class="isl-name" id="isl-name"></div>
+        <div class="perk-row" id="perk-row" hidden></div>
+      </section>
+      <section class="tl" id="timeline" aria-label="Сезони і припливи"></section>
+      <section class="scorebox" id="scorebox">
+        <div class="eyebrow">Очки острова</div>
+        <div class="score" id="score">0</div>
+        <div class="goalbar"><div class="goal-fill" id="goal-fill"></div><div class="goal-marks" id="goal-marks"></div></div>
+        <div class="goal-legend" id="goal-legend"></div>
+        <div class="run-line" id="run-line"></div>
+      </section>
+    </header>
+
+    <nav class="tools" aria-label="Інструменти">
+      <button type="button" id="btn-rot-l" class="tool" title="Повернути острів ліворуч (Q)" aria-label="Повернути острів ліворуч">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4.5h4.5"/></svg>
+      </button>
+      <button type="button" id="btn-rot-r" class="tool" title="Повернути острів праворуч (E)" aria-label="Повернути острів праворуч">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.5h-4.5"/></svg>
+      </button>
+      <button type="button" id="btn-map" class="tool" title="Мапа припливів (M): скільки припливів лишилось кожній клітинці" aria-label="Мапа припливів" aria-pressed="false">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 5l9 4.5-9 4.5z"/><path d="m3 14 9 4.5 9-4.5"/></svg>
+      </button>
+      <button type="button" id="btn-sound" class="tool" title="Звук" aria-label="Звук" aria-pressed="true">
+        <svg class="s-on" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+        <svg class="s-off" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></svg>
+      </button>
+      <button type="button" id="btn-help" class="tool" title="Правила і меню" aria-label="Правила і меню">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.7"/><path d="M12 17h.01"/></svg>
+      </button>
+    </nav>
+
+    <footer id="handwrap">
+      <div id="tide-chip" class="tide-chip" role="status" hidden></div>
+      <div id="hand" class="hand" aria-label="Карти на руці"></div>
+      <button type="button" id="reroll" class="reroll" title="Скинути руку й отримати три нові карти (R)">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h11l-3-3M20 17H9l3 3"/></svg>
+        <span>Інші карти</span><span class="badge" id="reroll-n">1</span>
+      </button>
+    </footer>
+  </div>
+
+  <div id="banner" class="banner" role="status" aria-live="polite"></div>
+  <div id="intro" class="intro" hidden></div>
+  <div id="coach" class="coach" role="dialog" aria-live="polite" hidden>
+    <p id="coach-text"></p>
+    <button type="button" id="coach-ok" class="btn small">Зрозуміло</button>
+  </div>
+
+  <div id="screen-start" class="screen start" hidden>
+    <div id="start-panel" class="panel start-panel">
+      <div class="logo">
+        <svg viewBox="0 0 48 48" width="46" height="46" aria-hidden="true">
+          <rect x="2" y="2" width="44" height="44" rx="13" fill="#1E2328"/>
+          <path d="M9 30c3.4 0 3.4-3.2 6.8-3.2s3.4 3.2 6.8 3.2 3.4-3.2 6.8-3.2 3.4 3.2 6.8 3.2 3.4-3.2 2.8-3.2" fill="none" stroke="#2E7E92" stroke-width="3.2" stroke-linecap="round"/>
+          <path d="M14 22.5 21 16l7 6.5v1.5H14z" fill="#2F5FD0"/>
+          <rect x="29" y="12" width="4" height="12" rx="1" fill="#F6F4EF"/>
+          <path d="M28 12h6l-3-3.5z" fill="#7A5AD3"/>
+          <path d="M9 37c3.4 0 3.4-3.2 6.8-3.2s3.4 3.2 6.8 3.2 3.4-3.2 6.8-3.2 3.4 3.2 6.8 3.2 3.4-3.2 2.8-3.2" fill="none" stroke="#5FA2B3" stroke-width="3.2" stroke-linecap="round" opacity=".7"/>
+        </svg>
+        <span>Приплив</span>
+      </div>
+      <p class="tagline">Острівна настільна гра про громаду, яку щосезону наздоганяє море.</p>
+      <p class="lore">Острови Нижнього моря тонуть. Кожного сезону вода піднімається на один уступ, і вчорашній берег стає мілиною. Ти ведеш невелику громаду від острова до острова: ставиш хати й рибальні, зводиш дамби, збираєш урожай. Коли море забирає останні пагорби, човни рушають далі. До Високого Берега п’ять островів.</p>
+      <div class="legend" aria-label="Будівлі">
+        <span style="--c:#2F5FD0"><i></i>Хата</span>
+        <span style="--c:#0E9E8C"><i></i>Рибальня</span>
+        <span style="--c:#EE9F2E"><i></i>Тартак</span>
+        <span style="--c:#E2483D"><i></i>Ринок</span>
+        <span style="--c:#7A5AD3"><i></i>Маяк</span>
+        <span style="--c:#8F8B83"><i></i>Дамба</span>
+      </div>
+      <div class="btn-col">
+        <button type="button" id="btn-new" class="btn primary">Нова подорож</button>
+        <button type="button" id="btn-continue" class="btn ghost" hidden><span>Продовжити</span><small id="cont-sub"></small></button>
+        <button type="button" id="btn-how" class="btn link">Як грати</button>
+      </div>
+      <div class="best" id="best-line" hidden></div>
+    </div>
+  </div>
+
+  <div id="screen-help" class="screen modal" hidden>
+    <div class="panel help-panel" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <div class="help-head">
+        <h2 id="help-title">Як грати</h2>
+        <button type="button" id="btn-help-close" class="tool" aria-label="Закрити правила">×</button>
+      </div>
+      <div class="help-body">
+        <ol class="rules">
+          <li><b>Хід.</b> Обери одну з трьох карт і постав будівлю на вільну суху клітинку. Очки нараховуються одразу. Число над будівлею показує суму, а лінії ведуть до сусідів, які її змінюють.</li>
+          <li><b>Приплив.</b> Сезон триває 6 ходів. Наприкінці вода піднімається на один уступ і заливає все нижче, якщо до моря є прохід через сторони клітинок. Смугасті клітинки підуть під воду наступними.</li>
+          <li><b>Урожай.</b> Після кожного припливу кожна вціліла будівля дає +1 очко. Затоплені будівлі зникають, але очки, які вони вже дали, лишаються.</li>
+          <li><b>Дамба.</b> Не тоне і не пропускає воду. Вода не проходить через кути клітинок, тож дві дамби навскіс уже тримають воду. Обгороди низину, і вона лишиться сухою.</li>
+          <li><b>Острів.</b> Чотири сезони, чотири припливи. Набери хоча б одну зірку, щоб відплисти далі. Між островами обираєш здобуток, а з другого острова з’являються Ринки, з третього Маяки.</li>
+        </ol>
+        <h3>Будівлі</h3>
+        <div class="help-cards" id="help-cards"></div>
+        <h3>Керування</h3>
+        <ul class="keys">
+          <li><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> обрати карту</li>
+          <li><kbd>R</kbd> інші карти</li>
+          <li><kbd>Q</kbd><kbd>E</kbd> повернути острів</li>
+          <li><kbd>M</kbd> мапа припливів</li>
+          <li><kbd>Esc</kbd> або права кнопка: скасувати вибір</li>
+          <li>Колесо миші або два пальці: масштаб</li>
+          <li>Тягни поле, щоб його зсунути</li>
+          <li>На сенсорному екрані торкнись клітинки, а тоді ще раз, щоб поставити</li>
+        </ul>
+      </div>
+      <div class="help-foot" id="help-ingame" hidden>
+        <button type="button" id="btn-restart" class="btn ghost">Почати подорож заново</button>
+        <button type="button" id="btn-quit" class="btn ghost">Вийти в меню</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-result" class="screen modal" hidden>
+    <div class="panel result-panel" role="dialog" aria-modal="true" aria-labelledby="res-title">
+      <div class="eyebrow" id="res-eyebrow"></div>
+      <h2 id="res-title"></h2>
+      <div class="res-stars" id="res-stars"></div>
+      <p id="res-sub" class="res-sub"></p>
+      <div class="res-table" id="res-table"></div>
+      <div id="res-perks" class="res-perks"></div>
+      <div id="res-actions" class="res-actions"></div>
+    </div>
+  </div>
+
+  <div class="no-webgl-msg">Цій грі потрібен WebGL. Відкрий її в сучасному браузері з увімкненим апаратним прискоренням.</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* Приплив — чиста ігрова логіка (без рендеру). Працює і в браузері, і в Node. */
+(function (root) {
+  'use strict';
+
+  const N = 11;               // розмір поля
+  const SEASONS = 4;          // сезонів на острів (кожен закінчується припливом)
+  const TURNS = 6;            // ходів у сезоні
+  const ISLANDS = 5;          // островів у подорожі
+  const MAX_H = 5;
+
+  const T = { HOUSE: 0, FISH: 1, SAW: 2, MARKET: 3, LIGHT: 4, WALL: 5 };
+  const F = { NONE: 0, FOREST: 1, ROCK: 2 };
+
+  const TYPE_KEYS = ['house', 'fish', 'saw', 'market', 'light', 'wall'];
+  const TYPE_NAMES = ['Хата', 'Рибальня', 'Тартак', 'Ринок', 'Маяк', 'Дамба'];
+  const TYPE_RADIUS = [1, 2, 2, 2, 3, 0];
+
+  const SEASON_NAMES = ['Весна', 'Літо', 'Осінь', 'Зима'];
+
+  const TRAITS = {
+    calm:    { name: 'Тихий',     desc: 'Рівні схили, трохи лісу. Добре місце, щоб навчитися.', land: 60, rough: 0.55, hdist: [0.22, 0.22, 0.2, 0.19, 0.17], forest: 0.24, rock: 0.04 },
+    forest:  { name: 'Лісистий',  desc: 'Густі гаї вкривають схили. Тартакам тут роздолля.',     land: 58, rough: 0.6,  hdist: [0.23, 0.22, 0.2, 0.18, 0.17], forest: 0.38, rock: 0.03 },
+    rocky:   { name: 'Скелястий', desc: 'Високий, але кам’янистий. Будувати тісно, зате вода йде повільніше.', land: 60, rough: 0.7, hdist: [0.17, 0.19, 0.22, 0.21, 0.21], forest: 0.18, rock: 0.12 },
+    lowland: { name: 'Низинний',  desc: 'Пологі береги. Перші припливи заберуть багато землі.',   land: 62, rough: 0.5,  hdist: [0.31, 0.26, 0.18, 0.13, 0.12], forest: 0.22, rock: 0.04 },
+    bays:    { name: 'Затоки',    desc: 'Порізаний берег і глибокі затоки. Рибальні будуть щасливі.', land: 55, rough: 1.0, hdist: [0.25, 0.22, 0.2, 0.18, 0.15], forest: 0.2, rock: 0.05 },
+  };
+
+  const NAMES = ['Сольвар', 'Мілина', 'Чаїна Коса', 'Тиха Гряда', 'Остріг', 'Кремінь', 'Верес',
+    'Солона Брама', 'Ладань', 'Вітрило', 'Зелений Зуб', 'Порічка', 'Глибочок', 'Сива Скеля'];
+
+  const PERKS = [
+    { id: 'streets', name: 'Тісні вулиці', desc: 'Хата отримує +2, а не +1, за кожну Хату поруч, і Тартаки їй більше не заважають.', needs: T.HOUSE },
+    { id: 'nets',    name: 'Нові сіті',    desc: 'Кожна Рибальня приносить ще +2 очки.', needs: T.FISH },
+    { id: 'guild',   name: 'Гільдія теслярів', desc: 'Тартаки більше не віднімають очки один одному.', needs: T.SAW },
+    { id: 'fair',    name: 'Ярмарок',      desc: 'Ринок отримує ще +1 за кожну будівлю в радіусі 2.', needs: T.MARKET },
+    { id: 'watch',   name: 'Високий дозор', desc: 'Маяк отримує +2, а не +1, за кожен рівень висоти.', needs: T.LIGHT },
+    { id: 'masonry', name: 'Мурарі',       desc: 'Кожна Дамба дає 3 очки і приносить урожай, як звичайна будівля.', needs: T.WALL },
+    { id: 'feast',   name: 'Свято врожаю', desc: 'Урожай дає +2, а не +1, за кожну вцілілу будівлю.', needs: -1 },
+    { id: 'stores',  name: 'Запаси',       desc: 'Щосезону отримуєш 2 перероздачі карт замість 1.', needs: -1 },
+  ];
+
+  // ---------- RNG ----------
+  function rnd(st) { // st = {s: uint32}; мутує стан
+    let a = (st.s = (st.s + 0x6D2B79F5) | 0);
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  function hash2(a, b) {
+    let h = (a ^ Math.imul(b + 0x9E3779B9, 0x85EBCA6B)) >>> 0;
+    h = Math.imul(h ^ (h >>> 16), 0x7FEB352D) >>> 0;
+    h = Math.imul(h ^ (h >>> 15), 0x846CA68B) >>> 0;
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+  function makeNoise(rng, size) {
+    const g = [];
+    for (let i = 0; i < size * size; i++) g.push(rnd(rng));
+    const get = (i, j) => g[(((j % size) + size) % size) * size + (((i % size) + size) % size)];
+    const sm = (t) => t * t * (3 - 2 * t);
+    return (x, y) => {
+      const xi = Math.floor(x), yi = Math.floor(y);
+      const xf = sm(x - xi), yf = sm(y - yi);
+      const a = get(xi, yi), b = get(xi + 1, yi), c = get(xi, yi + 1), d = get(xi + 1, yi + 1);
+      return a + (b - a) * xf + (c - a) * yf + (a - b - c + d) * xf * yf;
+    };
+  }
+
+  // ---------- Поле ----------
+  const idx = (x, y) => y * N + x;
+  const cx = (c) => c % N;
+  const cy = (c) => (c / N) | 0;
+  function forR(c, r, cb) {
+    const x0 = cx(c), y0 = cy(c);
+    for (let dy = -r; dy <= r; dy++) {
+      const y = y0 + dy; if (y < 0 || y >= N) continue;
+      for (let dx = -r; dx <= r; dx++) {
+        if (!dx && !dy) continue;
+        const x = x0 + dx; if (x < 0 || x >= N) continue;
+        cb(y * N + x);
+      }
+    }
+  }
+  function n4(c) {
+    const x = cx(c), y = cy(c), out = [];
+    if (x > 0) out.push(c - 1); if (x < N - 1) out.push(c + 1);
+    if (y > 0) out.push(c - N); if (y < N - 1) out.push(c + N);
+    return out;
+  }
+
+  function generateIsland(seed, traitKey) {
+    const tr = TRAITS[traitKey];
+    const rng = { s: seed >>> 0 };
+    let best = null;
+    for (let attempt = 0; attempt < 80; attempt++) {
+      const n1 = makeNoise(rng, 6), n2 = makeNoise(rng, 7), nf = makeNoise(rng, 5);
+      const ox = rnd(rng) * 6, oy = rnd(rng) * 6;
+      const ccx = (N - 1) / 2 + (rnd(rng) - 0.5) * 1.2, ccy = (N - 1) / 2 + (rnd(rng) - 0.5) * 1.2;
+      const ang = rnd(rng) * Math.PI, el = 1 + rnd(rng) * 0.3;
+      const ca = Math.cos(ang), sa = Math.sin(ang);
+      const vals = new Array(N * N).fill(-1e9);
+      const inner = [];
+      for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
+        const dx = x - ccx, dy = y - ccy;
+        const rx = dx * ca + dy * sa, ry = -dx * sa + dy * ca;
+        const d = Math.sqrt((rx / el) * (rx / el) + (ry * el) * (ry * el)) / 4.7;
+        const c = idx(x, y);
+        vals[c] = 1 - d + (n1(x * 0.42 + ox, y * 0.42 + oy) - 0.5) * tr.rough + (n2(x * 0.9 + oy, y * 0.9 + ox) - 0.5) * tr.rough * 0.45;
+        inner.push(c);
+      }
+      const landTarget = tr.land + Math.floor(rnd(rng) * 5) - 2;
+      inner.sort((a, b) => vals[b] - vals[a]);
+      const isLand = new Array(N * N).fill(0);
+      for (let i = 0; i < landTarget; i++) isLand[inner[i]] = 1;
+      // прибрати острівці менше 3 клітинок
+      const comp = new Array(N * N).fill(-1);
+      let ci = 0;
+      for (let c = 0; c < N * N; c++) {
+        if (!isLand[c] || comp[c] >= 0) continue;
+        const q = [c]; comp[c] = ci; const members = [c];
+        while (q.length) { const u = q.pop(); for (const v of n4(u)) if (isLand[v] && comp[v] < 0) { comp[v] = ci; q.push(v); members.push(v); } }
+        if (members.length < 3) for (const m of members) isLand[m] = 0;
+        ci++;
+      }
+      const land = [];
+      for (let c = 0; c < N * N; c++) if (isLand[c]) land.push(c);
+      land.sort((a, b) => vals[a] - vals[b]);
+      const height = new Array(N * N).fill(0);
+      let acc = 0, k = 0;
+      for (let h = 1; h <= MAX_H; h++) {
+        acc += tr.hdist[h - 1];
+        const upto = h === MAX_H ? land.length : Math.round(acc * land.length);
+        while (k < upto) height[land[k++]] = h;
+      }
+      const feature = new Array(N * N).fill(F.NONE);
+      const fcand = land.filter((c) => height[c] >= 2 && height[c] <= 4)
+        .map((c) => ({ c, v: nf(cx(c) * 0.55 + ox, cy(c) * 0.55 + oy) + rnd(rng) * 0.25 }))
+        .sort((a, b) => b.v - a.v);
+      const nForest = Math.round(tr.forest * land.length);
+      for (let i = 0; i < Math.min(nForest, fcand.length); i++) feature[fcand[i].c] = F.FOREST;
+      const rcand = land.filter((c) => height[c] >= 3 && feature[c] === F.NONE);
+      const nRock = Math.round(tr.rock * land.length);
+      for (let i = 0; i < nRock && rcand.length; i++) {
+        const j = Math.floor(rnd(rng) * rcand.length);
+        feature[rcand[j]] = F.ROCK; rcand.splice(j, 1);
+      }
+      let buildable = 0, high = 0;
+      for (const c of land) if (feature[c] !== F.ROCK) { buildable++; if (height[c] >= 4) high++; }
+      const res = { height, feature, buildable, high };
+      if (buildable >= 44 && high >= 14) return res;
+      if (!best || high > best.high) best = res;
+    }
+    return best;
+  }
+
+  // ---------- Колода ----------
+  function deckFor(islandIdx) { // islandIdx 0-based
+    const d = { 0: 40, 1: 22, 2: 22, 5: 15 };
+    if (islandIdx >= 1) d[3] = 14;
+    if (islandIdx >= 2) d[4] = 11;
+    return d;
+  }
+  function drawHand(st) {
+    const pool = Object.keys(st.deck).map((t) => ({ t: +t, w: st.deck[t] }));
+    const hand = [];
+    for (let k = 0; k < 3 && pool.length; k++) {
+      let tot = 0; for (const p of pool) tot += p.w;
+      let r = rnd(st.rng) * tot, j = 0;
+      for (; j < pool.length - 1; j++) { r -= pool[j].w; if (r < 0) break; }
+      hand.push(pool[j].t); pool.splice(j, 1);
+    }
+    return hand;
+  }
+
+  // ---------- Правила ----------
+  function canPlace(st, c) {
+    return c >= 0 && c < N * N && !st.flooded[c] && st.height[c] > 0 && st.building[c] < 0 && st.feature[c] !== F.ROCK;
+  }
+  function anyPlaceable(st) { for (let c = 0; c < N * N; c++) if (canPlace(st, c)) return true; return false; }
+
+  function scorePlacement(st, c, type, perks) {
+    const P = perks || [];
+    const has = (id) => P.indexOf(id) >= 0;
+    const parts = []; let total = 0;
+    const add = (cell, delta, kind, ref) => { if (delta) { parts.push({ cell, delta, kind, ref }); total += delta; } };
+    const B = st.building;
+    switch (type) {
+      case T.HOUSE:
+        add(c, 1, 'base');
+        forR(c, 1, (i) => {
+          if (B[i] === T.HOUSE) add(i, has('streets') ? 2 : 1, 'b', T.HOUSE);
+          else if (B[i] === T.SAW && !has('streets')) add(i, -2, 'b', T.SAW);
+        });
+        break;
+      case T.FISH:
+        forR(c, 1, (i) => { if (st.flooded[i]) add(i, 1, 'water'); });
+        forR(c, 2, (i) => { if (B[i] === T.FISH) add(i, -3, 'b', T.FISH); });
+        if (has('nets')) add(c, 2, 'perk');
+        break;
+      case T.SAW:
+        forR(c, 2, (i) => { if (st.feature[i] === F.FOREST && !st.flooded[i] && B[i] < 0) add(i, 1, 'forest'); });
+        if (!has('guild')) forR(c, 2, (i) => { if (B[i] === T.SAW) add(i, -2, 'b', T.SAW); });
+        break;
+      case T.MARKET: {
+        const kinds = {};
+        forR(c, 2, (i) => {
+          const b = B[i];
+          if (b === T.HOUSE) add(i, 1, 'b', T.HOUSE);
+          if (b === T.MARKET) add(i, -4, 'b', T.MARKET);
+          if (b >= 0 && b !== T.WALL && b !== T.MARKET) kinds[b] = 1;
+          if (has('fair') && b >= 0 && b !== T.WALL) add(i, 1, 'perk', b);
+        });
+        const nk = Object.keys(kinds).length;
+        add(c, 2 * nk, 'variety', nk);
+        break;
+      }
+      case T.LIGHT:
+        add(c, st.height[c] * (has('watch') ? 2 : 1), 'height', st.height[c]);
+        forR(c, 3, (i) => {
+          if (B[i] === T.FISH) add(i, 2, 'b', T.FISH);
+          else if (B[i] === T.LIGHT) add(i, -5, 'b', T.LIGHT);
+        });
+        break;
+      case T.WALL:
+        if (has('masonry')) add(c, 3, 'perk');
+        break;
+    }
+    return { total, parts };
+  }
+
+  // Заливка від моря: вода йде лише по сторонах клітинок (не по діагоналі)
+  function floodFill(st, W, extraWall, flooded) {
+    const fl = flooded || st.flooded;
+    const dist = new Array(N * N).fill(-1);
+    const q = []; const out = [];
+    for (let c = 0; c < N * N; c++) if (fl[c]) { dist[c] = 0; q.push(c); }
+    for (let h = 0; h < q.length; h++) {
+      const u = q[h];
+      for (const v of n4(u)) {
+        if (dist[v] >= 0 || fl[v]) continue;
+        if (st.height[v] > W || st.building[v] === T.WALL || v === extraWall) continue;
+        dist[v] = dist[u] + 1; q.push(v); out.push({ c: v, d: dist[v] });
+      }
+    }
+    return out;
+  }
+  // at[c]: 0 — вже вода; k (1..4) — номер припливу, що її затопить; 99 — вистоїть до кінця
+  function forecast(st, extraWall) {
+    const fl = st.flooded.slice();
+    const at = new Array(N * N).fill(99);
+    for (let c = 0; c < N * N; c++) if (fl[c]) at[c] = 0;
+    for (let k = st.W + 1; k <= SEASONS; k++) {
+      const nw = floodFill(st, k, extraWall == null ? -1 : extraWall, fl);
+      for (const o of nw) { fl[o.c] = 1; at[o.c] = k; }
+    }
+    return at;
+  }
+  function harvestsFor(st, c, at) { // скільки ще врожаїв збере будівля на клітинці
+    const lastSafe = Math.min(SEASONS, at[c] - 1);
+    return Math.max(0, lastSafe - st.season);
+  }
+  function harvestCounts(type, perks) {
+    return type !== T.WALL || (perks || []).indexOf('masonry') >= 0;
+  }
+
+  // ---------- Хід ----------
+  function place(st, c, handIdx, perks) {
+    const type = st.hand[handIdx];
+    const sc = scorePlacement(st, c, type, perks);
+    st.score += sc.total; st.placeScore += sc.total;
+    st.building[c] = type; st.bScore[c] = sc.total;
+    const hadForest = st.feature[c] === F.FOREST;
+    if (hadForest) st.feature[c] = F.NONE;
+    st.turn++; st.placed++;
+    const ev = { type, c, score: sc, hadForest, seasonEnd: false };
+    if (st.turn >= TURNS || !anyPlaceable(st)) ev.seasonEnd = true;
+    else st.hand = drawHand(st);
+    return ev;
+  }
+  function reroll(st) {
+    if (st.rerolls <= 0) return false;
+    st.rerolls--; st.hand = drawHand(st); return true;
+  }
+  function tide(st, perks) {
+    const P = perks || [];
+    st.W += 1;
+    const nw = floodFill(st, st.W, -1);
+    const lost = [], drowned = [];
+    for (const o of nw) {
+      st.flooded[o.c] = 1;
+      if (st.building[o.c] >= 0) { lost.push({ c: o.c, type: st.building[o.c], d: o.d }); st.building[o.c] = -1; st.bScore[o.c] = 0; }
+      if (st.feature[o.c] !== F.NONE) { drowned.push({ c: o.c, f: st.feature[o.c], d: o.d }); st.feature[o.c] = F.NONE; }
+    }
+    const H = P.indexOf('feast') >= 0 ? 2 : 1;
+    const harvested = [];
+    for (let c = 0; c < N * N; c++) { const b = st.building[c]; if (b >= 0 && harvestCounts(b, P)) harvested.push(c); }
+    const gain = harvested.length * H;
+    st.score += gain; st.harvestScore += gain; st.lost += lost.length;
+    const ev = { W: st.W, flooded: nw, lost, drowned, harvested, gain, H, islandOver: false };
+    st.season += 1; st.turn = 0;
+    if (st.season >= SEASONS) { st.over = true; ev.islandOver = true; ev.stars = starsFor(st); }
+    else {
+      st.rerolls = Math.min(4, st.rerolls + (P.indexOf('stores') >= 0 ? 2 : 1));
+      st.hand = drawHand(st);
+      ev.noRoom = !anyPlaceable(st);
+    }
+    return ev;
+  }
+  function starsFor(st) { let s = 0; for (const g of st.goals) if (st.score >= g) s++; return s; }
+
+  // ---------- Бот для калібрування цілей ----------
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function botPlay(base, seed) {
+    const st = clone(base); st.rng = { s: seed >>> 0 }; st.hand = drawHand(st);
+    let guard = 0;
+    while (!st.over && guard++ < 200) {
+      if (!anyPlaceable(st)) { tide(st, []); continue; }
+      const at = forecast(st);
+      let best = null;
+      for (let h = 0; h < st.hand.length; h++) {
+        const t = st.hand[h];
+        for (let c = 0; c < N * N; c++) {
+          if (!canPlace(st, c)) continue;
+          const v = t === T.WALL ? -0.5 : scorePlacement(st, c, t, []).total + harvestsFor(st, c, at);
+          if (!best || v > best.v) best = { h, c, v };
+        }
+      }
+      const ev = place(st, best.c, best.h, []);
+      if (ev.seasonEnd) tide(st, []);
+    }
+    return st.score;
+  }
+  const GOAL_A = [0.62, 0.7, 0.76, 0.8, 0.84];
+  function computeGoals(st, sims) {
+    const K = sims || 9; const res = [];
+    for (let i = 0; i < K; i++) res.push(botPlay(st, hash2(st.seed, 1000 + i)));
+    res.sort((a, b) => a - b);
+    const M = res[(K / 2) | 0];
+    const a = GOAL_A[Math.min(st.idx, GOAL_A.length - 1)];
+    const r5 = (v) => Math.max(5, Math.round(v / 5) * 5);
+    const g1 = r5(M * a), g2 = Math.max(g1 + 5, r5(M * (a + 0.2))), g3 = Math.max(g2 + 5, r5(M * (a + 0.38)));
+    return { goals: [g1, g2, g3], median: M, sims: res };
+  }
+
+  // ---------- Подорож ----------
+  function pickFrom(list, used, seed) {
+    const free = list.filter((x) => used.indexOf(x) < 0);
+    const arr = free.length ? free : list;
+    return arr[hash2(seed, 77) % arr.length];
+  }
+  function newRun(seed) {
+    return { v: 2, seed: seed >>> 0, island: 0, total: 0, stars: [], scores: [], perks: [], names: [], traits: [], phase: 'play', st: null };
+  }
+  function makeIsland(run) {
+    const i = run.island;
+    const seed = hash2(run.seed, i + 1);
+    const traitKey = i === 0 ? 'calm' : pickFrom(['forest', 'bays', 'rocky', 'lowland', 'calm'], run.traits, seed);
+    const name = pickFrom(NAMES, run.names, seed ^ 0xABCD);
+    run.traits.push(traitKey); run.names.push(name);
+    const geo = generateIsland(seed, traitKey);
+    const flooded = geo.height.map((h) => (h > 0 ? 0 : 1));
+    const st = {
+      idx: i, seed, name, trait: traitKey,
+      height: geo.height, feature: geo.feature, flooded,
+      building: new Array(N * N).fill(-1), bScore: new Array(N * N).fill(0),
+      W: 0, season: 0, turn: 0, placed: 0,
+      score: 0, placeScore: 0, harvestScore: 0, lost: 0,
+      rng: { s: hash2(seed, 99) }, deck: deckFor(i), hand: [],
+      rerolls: run.perks.indexOf('stores') >= 0 ? 2 : 1, over: false, goals: [0, 0, 0],
+    };
+    const g = computeGoals(st);
+    st.goals = g.goals; st.median = g.median;
+    st.hand = drawHand(st);
+    run.st = st; run.phase = 'play';
+    return st;
+  }
+  function finishIsland(run) {
+    const st = run.st; const s = starsFor(st);
+    run.stars.push(s); run.scores.push(st.score);
+    if (s >= 1) { run.total += st.score; run.phase = run.island + 1 >= ISLANDS ? 'won' : 'perk'; }
+    else run.phase = 'over';
+    return s;
+  }
+  function perkOffer(run) {
+    const nextDeck = deckFor(run.island + 1);
+    const pool = PERKS.filter((p) => run.perks.indexOf(p.id) < 0 && (p.needs < 0 || nextDeck[p.needs] != null));
+    const rng = { s: hash2(run.seed, 500 + run.island) };
+    const out = [];
+    while (out.length < 3 && pool.length) out.push(pool.splice(Math.floor(rnd(rng) * pool.length), 1)[0]);
+    return out;
+  }
+  function takePerk(run, id) { if (id && run.perks.indexOf(id) < 0) run.perks.push(id); run.island++; }
+
+  const Logic = {
+    N, SEASONS, TURNS, ISLANDS, MAX_H, T, F, TYPE_KEYS, TYPE_NAMES, TYPE_RADIUS, SEASON_NAMES, TRAITS, PERKS,
+    rnd, hash2, idx, cx, cy, forR, n4, generateIsland, deckFor, drawHand, canPlace, anyPlaceable,
+    scorePlacement, floodFill, forecast, harvestsFor, harvestCounts, place, reroll, tide, starsFor,
+    botPlay, computeGoals, newRun, makeIsland, finishIsland, perkOffer, takePerk, clone,
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = Logic;
+  else root.Logic = Logic;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* Приплив — рендер, інтерфейс, анімації */
+(function () {
+  'use strict';
+  const L = window.Logic;
+  const { N, T, F, SEASONS, TURNS, ISLANDS } = L;
+  const $ = (s, el) => (el || document).querySelector(s);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const REDUCED = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const TS = REDUCED ? 0.4 : 1;
+
+  // ---------- Сховище ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('priplyv:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('priplyv:' + k, JSON.stringify(v)); } catch (e) { /* немає сховища */ } },
+    del(k) { try { localStorage.removeItem('priplyv:' + k); } catch (e) { /* */ } },
+  };
+
+  // ---------- Кольори ----------
+  const COL = {
+    house: '#2F5FD0', fish: '#0E9E8C', saw: '#EE9F2E', market: '#E2483D', light: '#7A5AD3', wall: '#8F8B83',
+    water: '#3F8FA4', forest: '#4F9E5E', gold: '#E8A317', ink: '#1E2328', danger: '#D9443A', white: '#F6F4EF',
+  };
+  const TYPE_COL = [COL.house, COL.fish, COL.saw, COL.market, COL.light, COL.wall];
+  const SEASON_PAL = [
+    { bg: '#E2E6DC', top: ['#EAD9AE', '#C6DE9C', '#A9D18A', '#8FC07B', '#CDCFC1'], side: ['#D4BF93', '#C3AC86'], tree: ['#7CC46D', '#5DAE66', '#98C95C'], water: '#97CAD4' },
+    { bg: '#E9E4D7', top: ['#EBD6A4', '#BDD58B', '#9EC579', '#84B36A', '#C9C6B6'], side: ['#D5BE91', '#C1A982'], tree: ['#4F9E5E', '#3E8B55', '#6CAA52'], water: '#92C5D1' },
+    { bg: '#EADBCE', top: ['#E8D2A4', '#D8CE8E', '#C9BC79', '#B4A56B', '#C8BFB1'], side: ['#D2BB90', '#BFA581'], tree: ['#E6A03A', '#D7703E', '#CBB24A'], water: '#96C2CC' },
+    { bg: '#DBE2E8', top: ['#E2DCC9', '#DCE4DB', '#E5ECE8', '#EFF3F3', '#F8FAFA'], side: ['#D1C4A6', '#C3B69C'], tree: ['#C6DBD3', '#B1CCC2', '#DCE8E3'], water: '#A1C5D2' },
+  ];
+
+  // ---------- Текст ----------
+  function plural(n, a, b, c) { const m10 = n % 10, m100 = n % 100; if (m10 === 1 && m100 !== 11) return a; if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return b; return c; }
+  const fmt = (v) => (v > 0 ? '+' + v : v < 0 ? '−' + Math.abs(v) : '0');
+  const esc = (s) => String(s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+
+  const ICON = {
+    house: '<path d="M3.5 11.2 12 4l8.5 7.2V20a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1z"/>',
+    fish: '<path d="M2.5 12c3.1-4.7 9-6.3 13.7-3L21 5.6v12.8l-4.8-3.4C11.5 18.3 5.6 16.7 2.5 12z"/>',
+    saw: '<path d="m12 2.5 1.7 2.6 3-.7.5 3.1 2.8 1.3-1.4 2.8 1.4 2.8-2.8 1.3-.5 3.1-3-.7L12 21.5l-1.7-2.4-3 .7-.5-3.1-2.8-1.3L5.4 12.6 4 9.8l2.8-1.3.5-3.1 3 .7z"/><circle cx="12" cy="12" r="2.8" fill="#fff"/>',
+    market: '<path d="M3 9.5 5 4h14l2 5.5a2.5 2.5 0 0 1-5 0 2.5 2.5 0 0 1-4 2 2.5 2.5 0 0 1-4-2 2.5 2.5 0 0 1-5 0zM5 13.5h14V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/>',
+    light: '<path d="M9 21.2 10.3 9h3.4L15 21.2zM9.4 8.2V5.6h5.2v2.6zM8.4 5 12 2.4 15.6 5z"/>',
+    wall: '<rect x="2.5" y="8" width="19" height="12.5" rx="1.6"/><path d="M2.5 14.2h19M8.2 8v6.2M15.8 8v6.2M12 14.2v6.3" stroke="#fff" stroke-width="1.4" fill="none"/>',
+    water: '<path d="M2.5 10.5c2.4 0 2.4-2.3 4.8-2.3s2.4 2.3 4.7 2.3 2.4-2.3 4.8-2.3 2.4 2.3 4.7 2.3M2.5 16.5c2.4 0 2.4-2.3 4.8-2.3s2.4 2.3 4.7 2.3 2.4-2.3 4.8-2.3 2.4 2.3 4.7 2.3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
+    forest: '<path d="M12 2.5 19 14h-4l3 4.4H6L9 14H5z"/><rect x="11" y="18" width="2" height="3.6" rx=".5"/>',
+    height: '<path d="M2.5 20.5h19L15 8.5l-3.2 5.2-2.3-3.2z"/>',
+    types: '<rect x="3" y="3" width="8" height="8" rx="2.2" fill="#2F5FD0"/><rect x="13" y="3" width="8" height="8" rx="2.2" fill="#0E9E8C"/><rect x="3" y="13" width="8" height="8" rx="2.2" fill="#EE9F2E"/><rect x="13" y="13" width="8" height="8" rx="2.2" fill="#7A5AD3"/>',
+    dot: '<circle cx="12" cy="12" r="5"/>',
+    star: '<path d="m12 2.8 2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3-4.6-4.4 6.3-.9z"/>',
+    harvest: '<path d="M12 21c-4.4 0-8-3.4-8-7.6C4 8.6 8.2 5.2 12 3c3.8 2.2 8 5.6 8 10.4 0 4.2-3.6 7.6-8 7.6z"/>',
+  };
+  const ICON_OF = ['house', 'fish', 'saw', 'market', 'light', 'wall'];
+  const svgI = (name, color, size) => `<svg class="ico" viewBox="0 0 24 24" width="${size || 14}" height="${size || 14}" fill="${color || 'currentColor'}" style="color:${color || 'currentColor'}" aria-hidden="true">${ICON[name]}</svg>`;
+  const ICON_COLOR = { house: COL.house, fish: COL.fish, saw: COL.saw, market: COL.market, light: COL.light, wall: COL.wall, water: COL.water, forest: COL.forest, height: COL.ink, types: COL.ink, dot: COL.ink };
+
+  function rulesFor(t, P) {
+    const has = (id) => P.indexOf(id) >= 0;
+    switch (t) {
+      case T.HOUSE: return [
+        { v: '+1', icon: 'dot', text: 'базово' },
+        { v: has('streets') ? '+2' : '+1', icon: 'house', text: 'кожна Хата поруч' },
+      ].concat(has('streets') ? [] : [{ v: '−2', icon: 'saw', text: 'кожен Тартак поруч', neg: true }]);
+      case T.FISH: return [
+        { v: '+1', icon: 'water', text: 'кожна клітинка води поруч' },
+        { v: '−3', icon: 'fish', text: 'інша Рибальня в радіусі 2', neg: true },
+      ].concat(has('nets') ? [{ v: '+2', icon: 'dot', text: 'базово, Нові сіті' }] : []);
+      case T.SAW: return [
+        { v: '+1', icon: 'forest', text: 'клітинка лісу в радіусі 2' },
+      ].concat(has('guild') ? [] : [{ v: '−2', icon: 'saw', text: 'інший Тартак у радіусі 2', neg: true }]);
+      case T.MARKET: return [
+        { v: '+2', icon: 'types', text: 'кожен різний тип у радіусі 2' },
+        { v: '+1', icon: 'house', text: 'кожна Хата в радіусі 2' },
+        { v: '−4', icon: 'market', text: 'інший Ринок у радіусі 2', neg: true },
+      ].concat(has('fair') ? [{ v: '+1', icon: 'dot', text: 'кожна будівля в радіусі 2' }] : []);
+      case T.LIGHT: return [
+        { v: has('watch') ? '+2' : '+1', icon: 'height', text: 'за кожен рівень висоти' },
+        { v: '+2', icon: 'fish', text: 'Рибальня в радіусі 3' },
+        { v: '−5', icon: 'light', text: 'інший Маяк у радіусі 3', neg: true },
+      ];
+      case T.WALL: return [
+        { v: '∞', icon: 'water', text: 'не тоне і не пропускає воду' },
+        has('masonry') ? { v: '+3', icon: 'dot', text: 'очки й урожай, Мурарі' } : { v: '0', icon: 'dot', text: 'очок і без урожаю', muted: true },
+      ];
+    }
+    return [];
+  }
+  const TYPE_SUB = ['житло громади', 'риба з мілини', 'дошки з лісу', 'торг для всіх', 'вогонь для човнів', 'стримує море'];
+
+  // ---------- Твіни ----------
+  const E = {
+    linear: (t) => t,
+    outCubic: (t) => 1 - Math.pow(1 - t, 3),
+    inCubic: (t) => t * t * t,
+    inQuad: (t) => t * t,
+    inOutCubic: (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
+    outBack: (t) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); },
+  };
+  const tweens = new Set();
+  let NOW = performance.now();
+  function tween(o) {
+    return new Promise((res) => {
+      tweens.add({ t0: NOW + (o.delay || 0) * TS, dur: Math.max(1, (o.dur || 300) * TS), ease: o.ease || E.outCubic, update: o.update, start: o.start, done: o.done, res, started: false });
+    });
+  }
+  function stepTweens() {
+    for (const tw of tweens) {
+      const t = (NOW - tw.t0) / tw.dur;
+      if (t < 0) continue;
+      if (!tw.started) { tw.started = true; if (tw.start) tw.start(); }
+      const k = Math.min(1, t);
+      if (tw.update) tw.update(tw.ease(k), k);
+      if (k >= 1) { tweens.delete(tw); if (tw.done) tw.done(); tw.res(); }
+    }
+  }
+  const sleep = (ms) => tween({ dur: ms });
+
+  // ---------- Звук ----------
+  const Sfx = {
+    ctx: null, master: null, on: store.get('sound', true),
+    ensure() {
+      if (this.ctx) return this.ctx;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      try { this.ctx = new AC(); this.master = this.ctx.createGain(); this.master.gain.value = 0.5; this.master.connect(this.ctx.destination); } catch (e) { this.ctx = null; }
+      return this.ctx;
+    },
+    tone(freq, dur, o) {
+      o = o || {};
+      if (!this.on) return; const ctx = this.ensure(); if (!ctx) return;
+      if (ctx.state === 'suspended') ctx.resume();
+      const t = ctx.currentTime + (o.delay || 0);
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = o.type || 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      if (o.slide) osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq * o.slide), t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(o.gain || 0.1, t + (o.attack || 0.006));
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      osc.connect(g); g.connect(this.master); osc.start(t); osc.stop(t + dur + 0.03);
+    },
+    noise(dur, o) {
+      o = o || {};
+      if (!this.on) return; const ctx = this.ensure(); if (!ctx) return;
+      const len = Math.floor(ctx.sampleRate * dur);
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate); const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      const f = ctx.createBiquadFilter(); f.type = 'lowpass';
+      const t = ctx.currentTime + (o.delay || 0);
+      f.frequency.setValueAtTime(o.from || 300, t);
+      f.frequency.exponentialRampToValueAtTime(o.to || 1400, t + dur * 0.55);
+      f.frequency.exponentialRampToValueAtTime(o.from || 300, t + dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(o.gain || 0.08, t + dur * 0.45); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(f); f.connect(g); g.connect(this.master); src.start(t); src.stop(t + dur + 0.05);
+    },
+    select() { this.tone(700, 0.07, { type: 'triangle', gain: 0.045 }); },
+    place(s) {
+      const f = 330 * Math.pow(2, clamp(s, -4, 14) / 12);
+      this.tone(f, 0.18, { type: 'triangle', gain: 0.11 });
+      this.tone(f * 1.5, 0.12, { type: 'sine', gain: 0.035, delay: 0.035 });
+      if (s < 0) this.tone(150, 0.22, { type: 'sine', gain: 0.07, slide: 0.6 });
+    },
+    tide() { this.noise(1.8, { gain: 0.09, from: 180, to: 900 }); this.tone(98, 1.4, { gain: 0.05, slide: 0.85 }); },
+    sink() { this.tone(240, 0.4, { gain: 0.05, slide: 0.45 }); },
+    harvest(i) { const sc = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24]; this.tone(523 * Math.pow(2, sc[i % sc.length] / 12), 0.1, { type: 'triangle', gain: 0.04, delay: i * 0.045 * TS }); },
+    star(i) { const f = [523, 659, 784][i] || 784; this.tone(f, 0.3, { type: 'triangle', gain: 0.1 }); this.tone(f * 2, 0.22, { gain: 0.03, delay: 0.04 }); },
+    whoosh() { this.noise(0.5, { gain: 0.05, from: 700, to: 2600 }); },
+    bad() { this.tone(170, 0.16, { type: 'square', gain: 0.02, slide: 0.8 }); },
+    fail() { [392, 330, 262].forEach((f, i) => this.tone(f, 0.4, { type: 'triangle', gain: 0.07, delay: i * 0.16 })); },
+    win() { [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.35, { type: 'triangle', gain: 0.08, delay: i * 0.11 })); },
+  };
+
+  // ---------- Сцена ----------
+  const canvas = $('#scene');
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  } catch (e) {
+    document.body.classList.add('no-webgl');
+    return;
+  }
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(SEASON_PAL[0].bg);
+  const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 200);
+  const hemi = new THREE.HemisphereLight(0xffffff, 0xd6cdbd, 0.5);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff3e3, 0.72);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -11, right: 11, top: 11, bottom: -11, near: 1, far: 70 });
+  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+  scene.add(sun); scene.add(sun.target);
+
+  const BASE = 0.16, STEP = 0.3;
+  const tileTop = (h) => BASE + h * STEP;
+  const waterTop = (W) => BASE + W * STEP + 0.075;
+  const OFF = (N - 1) / 2;
+  const wx = (c) => (c % N) - OFF;
+  const wz = (c) => ((c / N) | 0) - OFF;
+  const BH = [0.74, 0.42, 0.42, 0.48, 1.1, 0];
+
+  // ---------- Матеріали ----------
+  function std(hex, extra) {
+    return new THREE.MeshStandardMaterial(Object.assign({ color: new THREE.Color(hex), roughness: 1, metalness: 0, flatShading: true }, extra || {}));
+  }
+  const pal0 = SEASON_PAL[0];
+  const M = {
+    topH: [null].concat(pal0.top.map((c) => std(c))),
+    side: [std(pal0.side[0]), std(pal0.side[1])],
+    water: std(pal0.water), waterSide: std(new THREE.Color(pal0.water).multiplyScalar(0.8).getHex()),
+    plinth: std('#3B454F'), plinthTop: std('#46515C'),
+    white: std(COL.white), wood: std('#A47A52'), dark: std('#353A41'), steel: std('#A3A9AF'),
+    stone: std('#A6A197'), stoneTop: std('#C4BFB5'), rock: std('#B9B3A8'),
+    tree: pal0.tree.map((c) => std(c)), trunk: std('#8C6A4C'),
+    type: TYPE_COL.map((c) => std(c)),
+    typeDark: TYPE_COL.map((c) => std(new THREE.Color(c).multiplyScalar(0.72).getHex())),
+    lamp: new THREE.MeshBasicMaterial({ color: '#FFD66B' }),
+    beam: new THREE.MeshBasicMaterial({ color: '#FFE39A', transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
+  };
+  M.sideH = [null, M.side[0], M.side[1], M.side[1], M.side[1], M.side[1]];
+  const ghostCache = new Map();
+  function ghostMat(m) {
+    if (Array.isArray(m)) return m.map(ghostMat);
+    let g = ghostCache.get(m);
+    if (!g) { g = m.clone(); g.transparent = true; g.opacity = 0.62; ghostCache.set(m, g); }
+    return g;
+  }
+
+  // ---------- Текстури ----------
+  function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+  function canvasTex(size, draw) {
+    const cv = document.createElement('canvas'); cv.width = cv.height = size;
+    draw(cv.getContext('2d'), size);
+    const t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return t;
+  }
+  const TEX = {
+    fill: canvasTex(128, (g, s) => { g.fillStyle = '#fff'; rr(g, 7, 7, s - 14, s - 14, 22); g.fill(); }),
+    ring: canvasTex(128, (g, s) => { g.strokeStyle = '#fff'; g.lineWidth = 9; rr(g, 10, 10, s - 20, s - 20, 20); g.stroke(); }),
+    stripes: canvasTex(128, (g, s) => {
+      g.save(); rr(g, 7, 7, s - 14, s - 14, 22); g.clip();
+      g.strokeStyle = '#fff'; g.lineWidth = 9;
+      for (let i = -s; i < 2 * s; i += 24) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + s, s); g.stroke(); }
+      g.restore();
+    }),
+    blob: canvasTex(128, (g, s) => {
+      const gr = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+      gr.addColorStop(0, 'rgba(0,0,0,0.6)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.28)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, s, s);
+    }),
+  };
+  const planeGeo = new THREE.PlaneGeometry(1, 1);
+  const blobMat = new THREE.MeshBasicMaterial({ map: TEX.blob, transparent: true, depthWrite: false, opacity: 0.5 });
+
+  // ---------- Геометрія ----------
+  const GC = new Map();
+  const geo = (key, make) => { let g = GC.get(key); if (!g) { g = make(); GC.set(key, g); } return g; };
+  const box = (w, h, d) => geo(`b${w},${h},${d}`, () => new THREE.BoxGeometry(w, h, d));
+  const cyl = (rt, rb, h, s) => geo(`c${rt},${rb},${h},${s}`, () => new THREE.CylinderGeometry(rt, rb, h, s));
+  function prism(w, h, d) {
+    return geo(`p${w},${h},${d}`, () => {
+      const s = new THREE.Shape(); s.moveTo(-w / 2, 0); s.lineTo(w / 2, 0); s.lineTo(0, h); s.closePath();
+      const g = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: false }); g.translate(0, 0, -d / 2); return g;
+    });
+  }
+  function roundedShape(w, d, r) {
+    const s = new THREE.Shape(), x = -w / 2, y = -d / 2;
+    s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
+    s.lineTo(x + w, y + d - r); s.quadraticCurveTo(x + w, y + d, x + w - r, y + d);
+    s.lineTo(x + r, y + d); s.quadraticCurveTo(x, y + d, x, y + d - r);
+    s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+    return s;
+  }
+  function bevelBox(w, h, d, r, bev) {
+    const shape = roundedShape(w - 2 * bev, d - 2 * bev, r);
+    const g = new THREE.ExtrudeGeometry(shape, { depth: Math.max(0.002, h - 2 * bev), bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 2, curveSegments: 3, steps: 1 });
+    g.rotateX(-Math.PI / 2); g.translate(0, bev, 0);
+    return g;
+  }
+  const tileGeo = (h) => geo('tile' + h, () => bevelBox(1, tileTop(h), 1, 0.1, 0.045));
+  const waterGeo = (() => { const g = new THREE.BoxGeometry(1.004, 1, 1.004); g.translate(0, 0.5, 0); return g; })();
+  const pickGeo = (() => { const g = new THREE.BoxGeometry(1, 1, 1); g.translate(0, 0.5, 0); return g; })();
+  const pickMat = new THREE.MeshBasicMaterial();
+
+  // ---------- Будівлі ----------
+  function makeBuilding(type, c, st, ghost) {
+    const g = new THREE.Group();
+    g.userData = { cell: c, type, anim: null };
+    const mm = ghost ? ghostMat : (m) => m;
+    const body = new THREE.Group(); g.add(body);
+    const add = (geom, mat, x, y, z, rx, ry, rz, parent) => {
+      const m = new THREE.Mesh(geom, mm(mat)); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, rz || 0);
+      m.castShadow = !ghost; m.receiveShadow = !ghost; (parent || body).add(m); return m;
+    };
+    const hs = L.hash2(c + 17, type * 31 + 7);
+    const r1 = (hs % 1000) / 1000;
+    body.rotation.y = ((hs >> 10) & 1) * Math.PI / 2;
+    const h = st.height[c];
+    switch (type) {
+      case T.HOUSE: {
+        const tall = r1 < 0.34, bh = tall ? 0.42 : 0.3;
+        add(box(0.44, bh, 0.36), M.white, 0, bh / 2, 0);
+        add(prism(0.56, 0.24, 0.42), M.type[0], 0, bh, 0);
+        add(box(0.07, 0.16, 0.07), M.white, 0.13, bh + 0.13, -0.07);
+        add(box(0.1, 0.15, 0.02), M.typeDark[0], -0.08, 0.075, 0.18);
+        add(box(0.08, 0.08, 0.02), M.dark, 0.11, bh * 0.62, 0.18);
+        break;
+      }
+      case T.FISH: {
+        // орієнтація на найближчу воду
+        let dir = null, wc = -1;
+        for (const n of L.n4(c)) if (st.flooded[n]) { dir = [wx(n) - wx(c), wz(n) - wz(c)]; wc = n; break; }
+        if (dir) body.rotation.y = Math.atan2(dir[0], dir[1]);
+        add(box(0.36, 0.24, 0.3), M.white, 0, 0.12, -0.04);
+        add(box(0.44, 0.05, 0.4), M.type[1], 0, 0.285, -0.04, 0.22, 0, 0);
+        add(box(0.08, 0.08, 0.02), M.dark, 0, 0.12, 0.115);
+        if (dir) {
+          add(box(0.14, 0.04, 0.56), M.wood, 0.1, -0.03, 0.56);
+          const boat = new THREE.Group(); boat.position.set(-0.14, 0, 0.82); body.add(boat);
+          add(box(0.13, 0.06, 0.26), M.white, 0, 0.03, 0, 0, 0, 0, boat);
+          add(box(0.135, 0.02, 0.265), M.type[1], 0, 0.065, 0, 0, 0, 0, boat);
+          add(box(0.015, 0.18, 0.015), M.wood, 0, 0.16, 0.02, 0, 0, 0, boat);
+          g.userData.anim = { boat, wc, h, phase: r1 * 6 };
+        }
+        break;
+      }
+      case T.SAW: {
+        add(box(0.42, 0.22, 0.32), M.white, -0.05, 0.11, 0);
+        add(prism(0.52, 0.15, 0.38), M.type[2], -0.05, 0.22, 0);
+        add(cyl(0.045, 0.045, 0.3, 6), M.wood, 0.27, 0.045, -0.05, Math.PI / 2, 0, 0);
+        add(cyl(0.045, 0.045, 0.3, 6), M.wood, 0.27, 0.045, 0.05, Math.PI / 2, 0, 0);
+        add(cyl(0.045, 0.045, 0.3, 6), M.wood, 0.27, 0.125, 0, Math.PI / 2, 0, 0);
+        const saw = add(cyl(0.1, 0.1, 0.02, 10), M.steel, -0.05, 0.13, 0.18, Math.PI / 2, 0, 0);
+        g.userData.anim = { saw };
+        break;
+      }
+      case T.MARKET: {
+        add(box(0.46, 0.14, 0.18), M.white, 0, 0.07, 0.07);
+        add(box(0.46, 0.22, 0.06), M.white, 0, 0.11, -0.16);
+        for (const [x, z] of [[-0.22, -0.16], [0.22, -0.16], [-0.22, 0.14], [0.22, 0.14]]) add(box(0.03, 0.36, 0.03), M.white, x, 0.18, z);
+        for (let i = 0; i < 6; i++) add(box(0.084, 0.026, 0.42), i % 2 ? M.white : M.type[3], -0.21 + i * 0.084, 0.39, 0, 0.26, 0, 0);
+        add(box(0.1, 0.1, 0.1), M.type[2], -0.31, 0.05, 0.22, 0, 0.3, 0);
+        add(box(0.08, 0.08, 0.08), M.type[1], 0.31, 0.04, 0.24, 0, -0.4, 0);
+        add(box(0.07, 0.04, 0.07), M.type[3], -0.08, 0.16, 0.07);
+        add(box(0.07, 0.04, 0.07), M.type[2], 0.09, 0.16, 0.07);
+        break;
+      }
+      case T.LIGHT: {
+        add(box(0.36, 0.08, 0.36), M.white, 0, 0.04, 0);
+        add(cyl(0.11, 0.16, 0.72, 8), M.white, 0, 0.44, 0);
+        add(cyl(0.142, 0.152, 0.11, 8), M.type[4], 0, 0.27, 0);
+        add(cyl(0.122, 0.132, 0.1, 8), M.type[4], 0, 0.56, 0);
+        add(cyl(0.165, 0.165, 0.03, 8), M.dark, 0, 0.815, 0);
+        add(cyl(0.085, 0.085, 0.13, 8), M.lamp, 0, 0.895, 0);
+        add(cyl(0, 0.13, 0.13, 8), M.type[4], 0, 1.025, 0);
+        if (!ghost) {
+          const beam = new THREE.Group(); beam.position.y = 0.9; body.add(beam);
+          const bg = geo('beam', () => { const gg = new THREE.CylinderGeometry(0.02, 0.22, 1.7, 10, 1, true); gg.rotateZ(Math.PI / 2); gg.translate(0.9, 0, 0); return gg; });
+          const b1 = new THREE.Mesh(bg, M.beam); beam.add(b1);
+          const b2 = new THREE.Mesh(bg, M.beam); b2.rotation.y = Math.PI; beam.add(b2);
+          g.userData.anim = { beam, phase: r1 * 6 };
+        }
+        break;
+      }
+      case T.WALL: {
+        body.rotation.y = 0;
+        const wm = add(geo('wall', () => bevelBox(1, 1, 1, 0.08, 0.05)), [M.stoneTop, M.stone], 0, 0, 0);
+        wm.scale.y = wallH(c, st);
+        g.userData.wallMesh = wm;
+        break;
+      }
+    }
+    if (!ghost && type !== T.WALL) {
+      const s = new THREE.Mesh(planeGeo, blobMat); s.rotation.x = -Math.PI / 2; s.position.y = 0.006; s.scale.setScalar(0.98); s.renderOrder = 1; g.add(s);
+    }
+    g.position.set(wx(c), type === T.WALL ? 0 : tileTop(h), wz(c));
+    return g;
+  }
+  function wallH(c, st) { return Math.max(tileTop(st.height[c]) + 0.24, waterTop(st.W) + 0.2); }
+
+  // ---------- Дерева і скелі ----------
+  const treeGeo = {
+    pine: geo('pine', () => { const g = new THREE.CylinderGeometry(0, 0.19, 0.44, 6, 1); g.translate(0, 0.34, 0); return g; }),
+    pine2: geo('pine2', () => { const g = new THREE.CylinderGeometry(0, 0.14, 0.3, 6, 1); g.translate(0, 0.52, 0); return g; }),
+    round: geo('round', () => { const g = new THREE.IcosahedronGeometry(0.17, 0); g.translate(0, 0.3, 0); return g; }),
+    trunk: geo('trunk', () => { const g = new THREE.CylinderGeometry(0.03, 0.042, 0.16, 5); g.translate(0, 0.08, 0); return g; }),
+  };
+  function seeded(seed) { let s = seed >>> 0; return () => { s = (Math.imul(s, 1103515245) + 12345) >>> 0; return (s >>> 8) / 16777216; }; }
+  function makeTrees(c, h) {
+    const grp = new THREE.Group(); grp.position.set(wx(c), tileTop(h), wz(c));
+    const R = seeded(L.hash2(c, 913));
+    const spots = [[-0.21, -0.2], [0.21, -0.19], [-0.2, 0.21], [0.2, 0.2]];
+    const n = 2 + Math.floor(R() * 2.6);
+    const trees = [];
+    for (let i = 0; i < n; i++) {
+      const sp = spots.splice(Math.floor(R() * spots.length), 1)[0];
+      const t = new THREE.Group();
+      t.position.set(sp[0] + (R() - 0.5) * 0.1, 0, sp[1] + (R() - 0.5) * 0.1);
+      const s = 0.8 + R() * 0.38; t.scale.setScalar(s); t.rotation.y = R() * Math.PI;
+      const ci = Math.floor(R() * 3);
+      const tr = new THREE.Mesh(treeGeo.trunk, M.trunk); tr.castShadow = true; t.add(tr);
+      if (R() < 0.62) {
+        const a = new THREE.Mesh(treeGeo.pine, M.tree[ci]); a.castShadow = true; a.receiveShadow = true; t.add(a);
+        if (R() < 0.5) { const b = new THREE.Mesh(treeGeo.pine2, M.tree[ci]); b.castShadow = true; t.add(b); }
+      } else {
+        const a = new THREE.Mesh(treeGeo.round, M.tree[ci]); a.castShadow = true; a.receiveShadow = true; t.add(a);
+      }
+      t.userData.phase = R() * 6.28;
+      grp.add(t); trees.push(t);
+    }
+    return { group: grp, trees };
+  }
+  const rockGeo = geo('rock', () => new THREE.IcosahedronGeometry(1, 0));
+  function makeRocks(c, h) {
+    const grp = new THREE.Group(); grp.position.set(wx(c), tileTop(h), wz(c));
+    const R = seeded(L.hash2(c, 331));
+    const n = 2 + (R() < 0.5 ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(rockGeo, M.rock);
+      const s = i === 0 ? 0.24 : 0.12 + R() * 0.06;
+      m.scale.set(s * (0.9 + R() * 0.3), s * (0.6 + R() * 0.3), s * (0.9 + R() * 0.3));
+      m.position.set(i === 0 ? (R() - 0.5) * 0.1 : (R() - 0.5) * 0.6, s * 0.35, i === 0 ? (R() - 0.5) * 0.1 : (R() - 0.5) * 0.6);
+      m.rotation.set(R() * 3, R() * 3, R() * 3);
+      m.castShadow = true; m.receiveShadow = true; grp.add(m);
+    }
+    return grp;
+  }
+
+  // ---------- Наліпки на клітинках ----------
+  class Decals {
+    constructor(tex, order) { this.tex = tex; this.pool = []; this.used = 0; this.order = order; this.group = new THREE.Group(); scene.add(this.group); }
+    begin() { this.used = 0; }
+    add(c, color, opacity, y, scale) {
+      let m = this.pool[this.used];
+      if (!m) {
+        m = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
+        m.rotation.x = -Math.PI / 2; m.renderOrder = this.order; this.group.add(m); this.pool.push(m);
+      }
+      m.visible = true; m.material.color.set(color); m.material.opacity = opacity;
+      m.position.set(wx(c), y + 0.006, wz(c)); m.scale.setScalar(scale || 1);
+      this.used++; return m;
+    }
+    end() { for (let i = this.used; i < this.pool.length; i++) this.pool[i].visible = false; }
+    clear() { this.begin(); this.end(); }
+  }
+  const D = {
+    forecast: new Decals(TEX.stripes, 2),
+    map: new Decals(TEX.fill, 2),
+    radius: new Decals(TEX.fill, 3),
+    saved: new Decals(TEX.ring, 4),
+    cursor: new Decals(TEX.ring, 5),
+  };
+
+  // ---------- Підлога під дошкою ----------
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.ShadowMaterial({ opacity: 0.13 }));
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -0.6; ground.receiveShadow = true; scene.add(ground);
+  const aoPlane = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ map: TEX.blob, transparent: true, depthWrite: false, opacity: 0.32 }));
+  aoPlane.rotation.x = -Math.PI / 2; aoPlane.position.y = -0.598; aoPlane.scale.setScalar(N * 1.75); scene.add(aoPlane);
+
+  // ---------- Стан гри ----------
+  let run = null, st = null;
+  let B = null;          // посилання на тривимірну дошку
+  let mode = 'title';    // title | play | busy | result
+  let sel = -1, hover = -1;
+  let mapMode = false, touchMode = false;
+  let forecastAt = null;
+  let shownScore = 0;
+
+  // ---------- Дошка ----------
+  function surfY(c) {
+    if (!B || !st) return 0;
+    if (st.flooded[c]) return B.waterVis[c] || waterTop(st.W);
+    if (st.building[c] === T.WALL) { const g = B.bld.get(c); return g && g.userData.wallMesh ? g.userData.wallMesh.scale.y : wallH(c, st); }
+    return tileTop(st.height[c]);
+  }
+  function chipY(c) {
+    const b = st.building[c];
+    if (b >= 0 && b !== T.WALL) return tileTop(st.height[c]) + BH[b] + 0.1;
+    if (st.feature[c] === F.FOREST) return surfY(c) + 0.6;
+    return surfY(c) + 0.16;
+  }
+  function buildBoard(s) {
+    const grp = new THREE.Group();
+    const b = { grp, tiles: [], water: [], pick: [], feats: [], bld: new Map(), trees: [], waterVis: new Array(N * N).fill(0) };
+    const pl = new THREE.Mesh(geo('plinth', () => bevelBox(N + 0.36, 0.6, N + 0.36, 0.32, 0.07)), [M.plinthTop, M.plinth]);
+    pl.position.y = -0.6; pl.receiveShadow = true; pl.castShadow = true; grp.add(pl);
+    for (let c = 0; c < N * N; c++) {
+      const x = wx(c), z = wz(c), h = s.height[c];
+      const w = new THREE.Mesh(waterGeo, [M.waterSide, M.waterSide, M.water, M.waterSide, M.waterSide, M.waterSide]);
+      w.position.set(x, 0, z); w.receiveShadow = true;
+      const vis = s.flooded[c] ? waterTop(s.W) : 0;
+      b.waterVis[c] = vis; w.scale.y = Math.max(0.001, vis); w.visible = vis > 0; grp.add(w); b.water[c] = w;
+      if (h > 0) {
+        const t = new THREE.Mesh(tileGeo(h), [M.topH[h], M.sideH[h]]);
+        t.position.set(x, 0, z); t.castShadow = true; t.receiveShadow = true;
+        t.visible = !s.flooded[c] && s.building[c] !== T.WALL; grp.add(t); b.tiles[c] = t;
+        if (!s.flooded[c] && s.feature[c] === F.FOREST) { const tr = makeTrees(c, h); grp.add(tr.group); b.feats[c] = tr.group; b.trees.push(...tr.trees); }
+        if (!s.flooded[c] && s.feature[c] === F.ROCK) { const rk = makeRocks(c, h); grp.add(rk); b.feats[c] = rk; }
+      }
+      const p = new THREE.Mesh(pickGeo, pickMat); p.visible = false; p.position.set(x, 0, z); p.userData.cell = c; grp.add(p); b.pick[c] = p;
+    }
+    scene.add(grp);
+    B = b;
+    for (let c = 0; c < N * N; c++) if (s.building[c] >= 0) { const g = makeBuilding(s.building[c], c, s, false); grp.add(g); b.bld.set(c, g); }
+    updatePickAll();
+    return b;
+  }
+  function updatePick(c) {
+    if (!B) return;
+    const b = st.building[c];
+    let h = surfY(c);
+    if (b >= 0 && b !== T.WALL) h += BH[b];
+    else if (st.feature[c] === F.FOREST) h += 0.4;
+    B.pick[c].scale.y = Math.max(0.05, h);
+  }
+  function updatePickAll() { for (let c = 0; c < N * N; c++) updatePick(c); }
+
+  function popIn(b, s) {
+    const ps = [];
+    for (let c = 0; c < N * N; c++) {
+      const d = Math.hypot(L.cx(c) - OFF, L.cy(c) - OFF);
+      const delay = d * 55 + (L.hash2(c, 5) % 60);
+      const w = b.water[c];
+      if (b.waterVis[c] > 0) {
+        const to = b.waterVis[c]; w.scale.y = 0.001;
+        ps.push(tween({ dur: 520, delay: delay * 0.6, ease: E.outCubic, update: (k) => { w.scale.y = Math.max(0.001, to * k); } }));
+      }
+      const t = b.tiles[c];
+      if (t) { t.scale.y = 0.001; ps.push(tween({ dur: 560, delay, ease: E.outBack, update: (k) => { t.scale.y = Math.max(0.001, k); } })); }
+      const f = b.feats[c];
+      if (f) { f.scale.setScalar(0.001); ps.push(tween({ dur: 460, delay: delay + 200, ease: E.outBack, update: (k) => { f.scale.setScalar(Math.max(0.001, k)); } })); }
+      const g = b.bld.get(c);
+      if (g) { g.scale.setScalar(0.001); ps.push(tween({ dur: 480, delay: delay + 260, ease: E.outBack, update: (k) => { g.scale.setScalar(Math.max(0.001, k)); } })); }
+    }
+    return Promise.all(ps);
+  }
+  function exitBoard(b) {
+    if (!b) return Promise.resolve();
+    const g = b.grp;
+    Sfx.whoosh();
+    return tween({ dur: 760, ease: E.inCubic, update: (k) => { g.position.y = -k * 12; g.rotation.y = k * 0.25; } })
+      .then(() => { scene.remove(g); });
+  }
+
+  // ---------- Сезонні кольори ----------
+  function seasonTargets(idx) {
+    const p = SEASON_PAL[idx];
+    const pairs = [[scene.background, p.bg], [M.water.color, p.water], [M.waterSide.color, new THREE.Color(p.water).multiplyScalar(0.8)], [M.side[0].color, p.side[0]], [M.side[1].color, p.side[1]]];
+    for (let h = 1; h <= 5; h++) pairs.push([M.topH[h].color, p.top[h - 1]]);
+    for (let i = 0; i < 3; i++) pairs.push([M.tree[i].color, p.tree[i]]);
+    return pairs;
+  }
+  function syncBodyBg() { const hex = '#' + scene.background.getHexString(); document.documentElement.style.setProperty('--bg', hex); }
+  function applySeason(idx, dur, delay) {
+    const pairs = seasonTargets(idx);
+    const from = pairs.map((p) => p[0].clone());
+    const to = pairs.map((p) => new THREE.Color(p[1]));
+    if (!dur) { pairs.forEach((p, i) => p[0].copy(to[i])); syncBodyBg(); return Promise.resolve(); }
+    return tween({ dur, delay, ease: E.inOutCubic, update: (k) => { pairs.forEach((p, i) => p[0].copy(from[i]).lerp(to[i], k)); syncBodyBg(); } });
+  }
+
+  // ---------- Камера ----------
+  const ELEV = Math.atan(1 / Math.SQRT2);
+  const TARGET = new THREE.Vector3(0, 0.7, 0);
+  const cam = { theta: Math.PI / 4, thetaT: Math.PI / 4, zoom: 1, zoomT: 1, pan: { x: 0, y: 0 }, orbit: true };
+  const view = { vw: 1, vh: 1, rect: { x: 0, y: 0, w: 1, h: 1 }, rectT: { x: 0, y: 0, w: 1, h: 1 }, ext: null };
+  function placeCamera(theta) {
+    const d = 40;
+    camera.position.set(TARGET.x + Math.sin(theta) * Math.cos(ELEV) * d, TARGET.y + Math.sin(ELEV) * d, TARGET.z + Math.cos(theta) * Math.cos(ELEV) * d);
+    camera.lookAt(TARGET);
+    const rx = Math.cos(theta), rz = -Math.sin(theta);   // праворуч на екрані
+    const fx = -Math.sin(theta), fz = -Math.cos(theta);  // углиб сцени
+    sun.position.set(TARGET.x - rx * 7 + fx * 4, TARGET.y + 14, TARGET.z - rz * 7 + fz * 4);
+    sun.target.position.copy(TARGET);
+  }
+  function computeExtents() {
+    placeCamera(Math.PI / 4); camera.updateMatrixWorld();
+    const inv = camera.matrixWorldInverse; const v = new THREE.Vector3();
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; const hh = N / 2 + 0.2;
+    const pts = [];
+    for (const x of [-hh, hh]) for (const z of [-hh, hh]) for (const y of [-0.62, 1.55]) pts.push([x, y, z]);
+    for (const x of [-3.5, 3.5]) for (const z of [-3.5, 3.5]) pts.push([x, 3.0, z]);
+    for (const p of pts) {
+      v.set(p[0], p[1], p[2]).applyMatrix4(inv); x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y);
+    }
+    placeCamera(cam.theta);
+    return { w: x1 - x0, h: y1 - y0, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+  }
+  function measureRect() {
+    const vw = view.vw, vh = view.vh;
+    let r;
+    if (mode === 'title' || !document.body.classList.contains('in-game')) {
+      const p = $('#start-panel');
+      const pr = p && !$('#screen-start').hidden ? p.getBoundingClientRect() : null;
+      if (pr && vw >= 860) r = { x: pr.right + 12, y: 24, w: vw - pr.right - 36, h: vh - 48 };
+      else if (pr) r = { x: 12, y: 12, w: vw - 24, h: Math.max(160, pr.top - 18) };
+      else r = { x: 16, y: 16, w: vw - 32, h: vh - 32 };
+    } else {
+      const tb = $('#topbar').getBoundingClientRect().bottom;
+      document.documentElement.style.setProperty('--top-h', Math.round(tb) + 'px');
+      const top = (vw >= 960 ? $('#timeline').getBoundingClientRect().bottom : tb) + 6;
+      const bot = $('#handwrap').getBoundingClientRect().top - 4;
+      const side = vw >= 700 ? 64 : 12;
+      r = { x: side, y: top, w: vw - side * 2, h: Math.max(120, bot - top) };
+    }
+    view.rectT = r;
+  }
+  function layout() {
+    view.vw = window.innerWidth; view.vh = window.innerHeight;
+    renderer.setSize(view.vw, view.vh, false);
+    measureRect();
+  }
+  function applyFrustum() {
+    const r = view.rect, ext = view.ext;
+    const s = Math.min(r.w / ext.w, r.h / ext.h) * cam.zoom;
+    const ax = r.x + r.w / 2, ay = r.y + r.h / 2;
+    const lim = (ext.w / 2) * (1 - 1 / cam.zoom) + 0.6;
+    cam.pan.x = clamp(cam.pan.x, -lim, lim); cam.pan.y = clamp(cam.pan.y, -lim * 0.8, lim * 0.8);
+    const bcx = ext.cx + cam.pan.x, bcy = ext.cy + cam.pan.y;
+    camera.left = bcx - ax / s; camera.right = camera.left + view.vw / s;
+    camera.top = bcy + ay / s; camera.bottom = camera.top - view.vh / s;
+    camera.updateProjectionMatrix();
+    view.scale = s;
+  }
+  function rotate(dir) {
+    cam.thetaT += (dir * Math.PI) / 2;
+    Sfx.tone(520, 0.08, { type: 'triangle', gain: 0.04 });
+  }
+
+  // ---------- Оверлей: фішки і лінії ----------
+  const chipsEl = $('#chips');
+  const linksEl = $('#links');
+  const overlay = [];
+  let links = [];
+  function addChip(html, pos, cls, layer, dy) {
+    const pin = document.createElement('div'); pin.className = 'pin';
+    pin.innerHTML = `<div class="chip ${cls || ''}">${html}</div>`;
+    chipsEl.appendChild(pin);
+    const it = { el: pin, pos: pos.clone(), layer, dy: dy || 0 };
+    overlay.push(it); placeItem(it); return it;
+  }
+  function clearChips(layer) {
+    for (let i = overlay.length - 1; i >= 0; i--) if (overlay[i].layer === layer) { overlay[i].el.remove(); overlay.splice(i, 1); }
+  }
+  const _v = new THREE.Vector3();
+  function toScreen(p) { _v.copy(p).project(camera); return { x: (_v.x + 1) / 2 * view.vw, y: (1 - _v.y) / 2 * view.vh }; }
+  function placeItem(it) { const s = toScreen(it.pos); it.el.style.transform = `translate3d(${s.x.toFixed(1)}px,${(s.y + it.dy).toFixed(1)}px,0)`; }
+  function octPath(a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y, adx = Math.abs(dx), ady = Math.abs(dy);
+    const d = Math.min(adx, ady), sx = Math.sign(dx), sy = Math.sign(dy);
+    let m;
+    if (adx > ady) m = { x: a.x + sx * (adx - d), y: a.y };
+    else m = { x: a.x, y: a.y + sy * (ady - d) };
+    const r = Math.min(10, Math.hypot(m.x - a.x, m.y - a.y) * 0.5, Math.hypot(b.x - m.x, b.y - m.y) * 0.5);
+    const l1 = Math.hypot(m.x - a.x, m.y - a.y) || 1, l2 = Math.hypot(b.x - m.x, b.y - m.y) || 1;
+    const p1 = { x: m.x - (m.x - a.x) / l1 * r, y: m.y - (m.y - a.y) / l1 * r };
+    const p2 = { x: m.x + (b.x - m.x) / l2 * r, y: m.y + (b.y - m.y) / l2 * r };
+    return `M${a.x.toFixed(1)} ${a.y.toFixed(1)}L${p1.x.toFixed(1)} ${p1.y.toFixed(1)}Q${m.x.toFixed(1)} ${m.y.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}L${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
+  }
+  function renderLinks() {
+    let html = '';
+    for (const l of links) {
+      const a = toScreen(l.a), b = toScreen(l.b);
+      html += `<path d="${octPath(a, b)}" class="lk ${l.neg ? 'neg' : ''}" style="stroke:${l.color}"/><circle cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="3.2" class="lk-end" style="fill:${l.color}"/>`;
+    }
+    if (links.length) { const a = toScreen(links[0].a); html += `<circle cx="${a.x.toFixed(1)}" cy="${a.y.toFixed(1)}" r="4.5" class="lk-hub"/>`; }
+    linksEl.innerHTML = html;
+  }
+
+  // ---------- Прев’ю розміщення ----------
+  let ghost = null, ghostKey = '';
+  function hideGhost() { if (ghost) { ghost.parent && ghost.parent.remove(ghost); ghost = null; ghostKey = ''; } }
+  function showGhost(type, c) {
+    const key = type + ':' + c;
+    if (ghostKey === key && ghost) return;
+    hideGhost();
+    ghost = makeBuilding(type, c, st, true);
+    ghost.userData.baseY = ghost.position.y;
+    B.grp.add(ghost); ghostKey = key;
+  }
+  function partColor(p) {
+    if (p.kind === 'water') return COL.water;
+    if (p.kind === 'forest') return COL.forest;
+    if (p.kind === 'perk') return COL.gold;
+    if (p.kind === 'b') return TYPE_COL[p.ref];
+    return COL.ink;
+  }
+  const SELF_LABEL = { base: 'база', height: 'висота', variety: 'різні типи', perk: 'здобуток' };
+
+  function refreshPreview() {
+    clearChips('preview'); clearChips('map'); links = [];
+    D.radius.begin(); D.saved.begin(); D.cursor.begin();
+    hideTip();
+    let hypo = -1;
+    if (st && B && (mode === 'play') && hover >= 0) {
+      const c = hover;
+      if (sel >= 0) {
+        const type = st.hand[sel];
+        if (L.canPlace(st, c)) {
+          if (type === T.WALL) hypo = c;
+          showGhost(type, c);
+          const r = L.TYPE_RADIUS[type];
+          if (r > 0) L.forR(c, r, (i) => D.radius.add(i, TYPE_COL[type], 0.17, surfY(i)));
+          D.cursor.add(c, TYPE_COL[type], 0.95, tileTop(st.height[c]));
+          const sc = L.scorePlacement(st, c, type, run.perks);
+          const byCell = new Map(); const self = [];
+          for (const p of sc.parts) {
+            if (p.cell === c) { self.push(p); continue; }
+            const a = byCell.get(p.cell) || { delta: 0, first: p };
+            a.delta += p.delta; byCell.set(p.cell, a);
+          }
+          const hub = new THREE.Vector3(wx(c), tileTop(st.height[c]) + 0.18, wz(c));
+          for (const [cell, a] of byCell) {
+            if (!a.delta) continue;
+            const pos = new THREE.Vector3(wx(cell), chipY(cell), wz(cell));
+            const col = a.delta < 0 ? COL.danger : partColor(a.first);
+            addChip(`<i style="background:${partColor(a.first)}"></i>${fmt(a.delta)}`, pos, a.delta < 0 ? 'neg' : 'pos', 'preview');
+            links.push({ a: hub, b: pos, neg: a.delta < 0, color: col });
+          }
+          const subs = self.map((p) => `${SELF_LABEL[p.kind] || ''} ${fmt(p.delta)}`);
+          let note = '';
+          if (type === T.WALL) {
+            const at2 = L.forecast(st, c);
+            let cells = 0, blds = 0;
+            for (let i = 0; i < N * N; i++) {
+              if (i === c || st.flooded[i] || st.height[i] === 0) continue;
+              if (at2[i] > forecastAt[i]) { cells++; if (st.building[i] >= 0) blds++; D.saved.add(i, COL.fish, 0.95, surfY(i), 0.86); }
+            }
+            note = cells ? `рятує ${cells} ${plural(cells, 'клітинку', 'клітинки', 'клітинок')}${blds ? `, ${blds} ${plural(blds, 'будівлю', 'будівлі', 'будівель')}` : ''}` : 'поки нічого не рятує';
+          }
+          if (L.harvestCounts(type, run.perks)) {
+            const H = run.perks.indexOf('feast') >= 0 ? 2 : 1;
+            const n = L.harvestsFor(st, c, forecastAt);
+            const hn = n ? `урожай ще ${n}× по +${H}` : 'затоне в цей приплив';
+            note = note ? note + ' · ' + hn : hn;
+          }
+          const lines = subs.concat(note ? [note] : []);
+          const tap = touchMode ? '<em>торкнись ще раз, щоб поставити</em>' : '';
+          const top = new THREE.Vector3(wx(c), tileTop(st.height[c]) + (type === T.WALL ? Math.max(0.3, wallH(c, st) - tileTop(st.height[c])) : BH[type]) + 0.2, wz(c));
+          addChip(`<b>${fmt(sc.total)}</b>${lines.length ? `<span>${lines.map(esc).join('<br>')}</span>` : ''}${tap}`, top, 'total ' + (sc.total < 0 ? 'is-neg' : ''), 'preview', -6);
+        } else {
+          hideGhost();
+          D.cursor.add(c, COL.danger, 0.85, surfY(c));
+          const why = st.flooded[c] ? 'Тут вода' : st.feature[c] === F.ROCK ? 'Скеля, тут не збудуєш' : st.building[c] >= 0 ? 'Клітинка вже зайнята' : 'Тут не можна будувати';
+          addChip(esc(why), new THREE.Vector3(wx(c), chipY(c), wz(c)), 'warn', 'preview');
+        }
+      } else if (st.height[c] > 0) {
+        hideGhost();
+        D.cursor.add(c, COL.ink, 0.5, surfY(c));
+        showCellInfo(c);
+      }
+    } else hideGhost();
+    D.radius.end(); D.saved.end(); D.cursor.end();
+    refreshForecast(hypo);
+    renderLinks();
+  }
+  function showCellInfo(c) {
+    if (!st) return;
+    const b = st.building[c];
+    const pos = new THREE.Vector3(wx(c), chipY(c), wz(c));
+    let html = '';
+    if (st.flooded[c]) html = st.height[c] > 0 ? '<b>Затоплена земля</b>' : '<b>Море</b>';
+    else {
+      const at = forecastAt[c];
+      const left = at === 99 ? 'вистоїть до кінця острова' : `затопить ${at - st.W === 1 ? 'наступний приплив' : `через ${at - st.W} ${plural(at - st.W, 'приплив', 'припливи', 'припливів')}`}`;
+      const what = b >= 0 ? `${L.TYPE_NAMES[b]}${b !== T.WALL ? ` · дала ${fmt(st.bScore[c])}` : ''}` : st.feature[c] === F.FOREST ? 'Ліс' : st.feature[c] === F.ROCK ? 'Скеля' : 'Вільна земля';
+      html = `<b>${esc(what)}</b><span>висота ${st.height[c]} · ${esc(left)}</span>`;
+    }
+    addChip(html, pos, 'info', 'preview');
+  }
+  function refreshForecast(hypo) {
+    D.forecast.begin(); D.map.begin(); clearChips('map');
+    if (st && B && mode !== 'title' && !st.over) {
+      const at = hypo >= 0 ? L.forecast(st, hypo) : forecastAt;
+      const next = st.W + 1;
+      for (let c = 0; c < N * N; c++) {
+        if (st.flooded[c] || st.height[c] === 0 || st.building[c] === T.WALL || c === hypo) continue;
+        if (mapMode) {
+          if (at[c] === 99) continue;
+          const k = at[c] - st.W;
+          D.map.add(c, COL.water, [0, 0.62, 0.42, 0.27, 0.15][k] || 0.12, surfY(c), 0.92);
+          addChip(String(k), new THREE.Vector3(wx(c), surfY(c) + 0.05, wz(c)), 'mapnum k' + k, 'map', 8);
+        } else if (at[c] === next) D.forecast.add(c, '#2E7E92', 0.5, surfY(c), 0.96);
+      }
+    }
+    D.forecast.end(); D.map.end();
+  }
+
+  // ---------- Ефекти ----------
+  function ripple(c, color, y, big) {
+    const m = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ map: TEX.ring, color, transparent: true, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2; m.position.set(wx(c), (y == null ? surfY(c) : y) + 0.01, wz(c)); m.renderOrder = 6; scene.add(m);
+    const s1 = big ? 2.4 : 1.7;
+    return tween({ dur: 620, ease: E.outCubic, update: (k) => { m.scale.setScalar(0.7 + (s1 - 0.7) * k); m.material.opacity = 0.9 * (1 - k); } })
+      .then(() => { scene.remove(m); m.material.dispose(); });
+  }
+  function hop(obj, delay, amp) {
+    if (!obj) return Promise.resolve();
+    const y0 = obj.position.y;
+    return tween({ dur: 320, delay, ease: E.linear, update: (k) => { obj.position.y = y0 + Math.sin(Math.PI * k) * (amp || 0.16); const sq = 1 + Math.sin(Math.PI * k) * 0.08; obj.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq)); }, done: () => { obj.position.y = y0; obj.scale.set(1, 1, 1); } });
+  }
+  function floatChip(html, c, delay, cls) {
+    const pos = new THREE.Vector3(wx(c), chipY(c), wz(c));
+    return sleep(delay || 0).then(() => {
+      const it = addChip(html, pos, 'float ' + (cls || ''), 'fx');
+      return sleep(900).then(() => { it.el.remove(); const i = overlay.indexOf(it); if (i >= 0) overlay.splice(i, 1); });
+    });
+  }
+  function sinkObject(obj, delay) {
+    if (!obj) return Promise.resolve();
+    const y0 = obj.position.y, rz = (Math.random() - 0.5) * 0.7, rx = (Math.random() - 0.5) * 0.5;
+    return tween({ dur: 900, delay, ease: E.inCubic, update: (k) => { obj.position.y = y0 - k * 1.1; obj.rotation.z = rz * k; obj.rotation.x = rx * k; obj.scale.setScalar(1 - k * 0.3); } })
+      .then(() => { obj.parent && obj.parent.remove(obj); });
+  }
+  function dropIn(g) {
+    const y0 = g.position.y;
+    g.position.y = y0 + 1.5; g.scale.set(0.82, 1.3, 0.82);
+    return tween({ dur: 250, ease: E.inQuad, update: (k) => { g.position.y = y0 + 1.5 * (1 - k); } }).then(() => {
+      g.position.y = y0;
+      tween({ dur: 680, ease: E.linear, update: (k) => { const d = Math.exp(-4.6 * k) * Math.cos(k * Math.PI * 4.4); g.scale.set(1 + 0.22 * d, 1 - 0.32 * d, 1 + 0.22 * d); }, done: () => g.scale.set(1, 1, 1) });
+    });
+  }
+  function flyScore(text, fromPos, neg) {
+    const s = toScreen(fromPos);
+    const target = $('#score').getBoundingClientRect();
+    const el = document.createElement('div'); el.className = 'flyer' + (neg ? ' neg' : ''); el.textContent = text;
+    document.body.appendChild(el);
+    const tx = target.left + target.width / 2, ty = target.top + target.height / 2;
+    const mx = (s.x + tx) / 2 + (tx > s.x ? -40 : 40), my = Math.min(s.y, ty) - 70;
+    const anim = el.animate([
+      { transform: `translate(${s.x}px,${s.y}px) translate(-50%,-50%) scale(1)`, opacity: 1 },
+      { transform: `translate(${mx}px,${my}px) translate(-50%,-50%) scale(1.15)`, opacity: 1, offset: 0.45 },
+      { transform: `translate(${tx}px,${ty}px) translate(-50%,-50%) scale(0.6)`, opacity: 0.2 },
+    ], { duration: 640 * TS, easing: 'cubic-bezier(.45,.05,.4,1)' });
+    return new Promise((res) => { anim.onfinish = () => { el.remove(); res(); }; });
+  }
+
+  // ---------- HUD ----------
+  function setScore(v, animate) {
+    const el = $('#score');
+    if (!animate) { shownScore = v; el.textContent = v; renderGoalBar(v); return Promise.resolve(); }
+    const from = shownScore; shownScore = v;
+    el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+    return tween({ dur: 460, ease: E.outCubic, update: (k) => { const cur = Math.round(lerp(from, v, k)); el.textContent = cur; renderGoalBar(cur); } });
+  }
+  function renderGoalBar(v) {
+    if (!st) return;
+    const g = st.goals, max = g[2] * 1.12;
+    $('#goal-fill').style.width = clamp((v / max) * 100, 0, 100) + '%';
+    const marks = $('#goal-marks');
+    if (marks.dataset.k !== g.join(',')) {
+      marks.dataset.k = g.join(',');
+      marks.innerHTML = g.map((x, i) => `<span class="gm" style="left:${(x / max) * 100}%" data-i="${i}">${svgI('star', null, 13)}</span>`).join('');
+    }
+    marks.querySelectorAll('.gm').forEach((m, i) => m.classList.toggle('on', v >= g[i]));
+    $('#goal-legend').innerHTML = g.map((x, i) => `<span class="${v >= x ? 'on' : ''}">${'★'.repeat(i + 1)} ${x}</span>`).join('');
+  }
+  function renderIsland() {
+    $('#isl-eyebrow').textContent = `Острів ${st.idx + 1} / ${ISLANDS} · ${L.TRAITS[st.trait].name}`;
+    $('#isl-name').textContent = st.name;
+    const pr = $('#perk-row');
+    pr.innerHTML = run.perks.map((id) => { const p = L.PERKS.find((x) => x.id === id); return `<span class="perk-chip" title="${esc(p.desc)}">${esc(p.name)}</span>`; }).join('');
+    pr.hidden = !run.perks.length;
+    $('#run-line').textContent = run.total ? `Подорож: ${run.total} ${plural(run.total, 'очко', 'очки', 'очок')}` : 'Подорож тільки почалась';
+  }
+  function renderTimeline() {
+    const step = 13, gap = 28, segW = TURNS * step + gap, W = SEASONS * segW - gap + 22, H = 44;
+    const pos = st.season * TURNS + st.turn;
+    const xOf = (s, t) => 10 + s * segW + t * step;
+    const tideX = (s) => 10 + s * segW + (TURNS - 1) * step + 17;
+    let curX = st.season >= SEASONS ? tideX(SEASONS - 1) : xOf(st.season, st.turn);
+    let out = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">`;
+    out += `<line x1="10" y1="15" x2="${tideX(SEASONS - 1)}" y2="15" class="tl-base"/>`;
+    out += `<line x1="10" y1="15" x2="${curX}" y2="15" class="tl-done"/>`;
+    for (let s = 0; s < SEASONS; s++) {
+      for (let t = 0; t < TURNS; t++) {
+        const i = s * TURNS + t, x = xOf(s, t);
+        const cls = i < pos ? 'past' : i === pos ? 'now' : 'future';
+        out += `<circle cx="${x}" cy="15" r="${cls === 'now' ? 5.2 : 3.2}" class="tl-stop ${cls}"/>`;
+      }
+      const tx = tideX(s), done = s < st.season;
+      out += `<g class="tl-tide ${done ? 'done' : ''} ${s === st.season ? 'next' : ''}"><circle cx="${tx}" cy="15" r="8"/><path d="M${tx - 4.6} ${16.2}c1.5 0 1.5-2 3.07-2s1.53 2 3.06 2 1.54-2 3.07-2" /></g>`;
+      out += `<text x="${(xOf(s, 0) + tideX(s)) / 2}" y="39" class="tl-label ${s === st.season ? 'cur' : ''}">${L.SEASON_NAMES[s]}</text>`;
+    }
+    out += '</svg>';
+    $('#timeline').innerHTML = out;
+  }
+  function renderTideChip() {
+    const el = $('#tide-chip');
+    if (!st || st.over) { el.hidden = true; return; }
+    el.hidden = false;
+    const left = TURNS - st.turn;
+    let cells = 0, blds = 0;
+    for (let c = 0; c < N * N; c++) if (!st.flooded[c] && forecastAt[c] === st.W + 1) { cells++; if (st.building[c] >= 0) blds++; }
+    const when = left <= 1 ? 'Приплив після цього ходу' : `Приплив через ${left} ${plural(left, 'хід', 'ходи', 'ходів')}`;
+    const what = cells ? `затопить ${cells} ${plural(cells, 'клітинку', 'клітинки', 'клітинок')}${blds ? ` і ${blds} ${plural(blds, 'будівлю', 'будівлі', 'будівель')}` : ''}` : 'вода сюди не дійде';
+    el.innerHTML = `<span class="tc-ico">${svgI('water', null, 18)}</span><span class="tc-txt"><b>${when}</b><span>${what}</span></span>`;
+    el.classList.toggle('urgent', left <= 1);
+  }
+  function renderReroll() {
+    const b = $('#reroll');
+    $('#reroll-n').textContent = st ? st.rerolls : 0;
+    b.disabled = !st || st.rerolls <= 0 || mode !== 'play';
+  }
+  function cardHTML(t, i) {
+    const r = L.TYPE_RADIUS[t];
+    let grid = '';
+    if (r > 0) {
+      const S = 7, cs = 5;
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        const dx = Math.abs(x - 3), dy = Math.abs(y - 3);
+        const cls = !dx && !dy ? 'c' : Math.max(dx, dy) <= r ? 'r' : 'o';
+        grid += `<rect x="${x * (cs + 1)}" y="${y * (cs + 1)}" width="${cs}" height="${cs}" rx="1.2" class="${cls}"/>`;
+      }
+      grid = `<svg class="rgrid" viewBox="0 0 41 41" width="26" height="26" aria-hidden="true">${grid}</svg>`;
+    }
+    const rules = rulesFor(t, run ? run.perks : []).map((x) => `<li class="${x.neg ? 'neg' : ''} ${x.muted ? 'muted' : ''}"><b>${x.v}</b>${svgI(x.icon, ICON_COLOR[x.icon], 12)}<span>${esc(x.text)}</span></li>`).join('');
+    return `<span class="card-head"><span class="card-ico">${svgI(ICON_OF[t], '#fff', 18)}</span><span class="card-title"><span class="card-name">${L.TYPE_NAMES[t]}</span><span class="card-sub">${r ? 'радіус ' + r : TYPE_SUB[t]}</span></span>${grid}</span>
+      <ul class="card-rules">${rules}</ul>`;
+  }
+  function renderHand(deal) {
+    const hand = $('#hand');
+    hand.innerHTML = '';
+    if (!st || st.over) { renderReroll(); return; }
+    st.hand.forEach((t, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'card' + (i === sel ? ' is-sel' : '') + (deal ? ' deal' : '');
+      b.style.setProperty('--c', TYPE_COL[t]);
+      b.style.setProperty('--d', i * 70 + 'ms');
+      b.dataset.i = i; b.setAttribute('aria-pressed', i === sel ? 'true' : 'false');
+      b.setAttribute('aria-label', `${L.TYPE_NAMES[t]}, карта ${i + 1}`);
+      b.title = `${L.TYPE_NAMES[t]} · клавіша ${i + 1}`;
+      b.innerHTML = cardHTML(t, i);
+      b.addEventListener('click', () => selectCard(i));
+      hand.appendChild(b);
+    });
+    renderReroll();
+    hand.classList.toggle('locked', mode !== 'play');
+    measureRect();
+    if (coachStep) requestAnimationFrame(positionCoach);
+  }
+  function renderSel() {
+    document.querySelectorAll('#hand .card').forEach((b, i) => { b.classList.toggle('is-sel', i === sel); b.setAttribute('aria-pressed', i === sel ? 'true' : 'false'); });
+    document.body.classList.toggle('has-sel', sel >= 0);
+  }
+  function renderHUD() {
+    if (!st) return;
+    renderIsland(); renderTimeline(); renderTideChip(); renderReroll();
+    $('#btn-map').classList.toggle('on', mapMode);
+    $('#btn-sound').classList.toggle('off', !Sfx.on);
+    measureRect();
+  }
+  let bannerTimer = 0;
+  function banner(html, kind, ms) {
+    const el = $('#banner');
+    el.className = 'banner show ' + (kind || '');
+    el.innerHTML = html;
+    clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(() => { el.classList.remove('show'); }, (ms || 2200) * TS);
+  }
+  function hideTip() { /* підказки живуть у шарі фішок */ }
+
+  // ---------- Навчання ----------
+  const coachDone = store.get('coach', {});
+  let coachStep = null;
+  const COACH = {
+    hand: { text: 'Це твоя рука. Кожен хід обираєш одну з трьох карт і ставиш цю будівлю на острів.', at: () => $('#hand'), side: 'top' },
+    hover: { text: 'Наводь на клітинки. Число над будівлею показує, скільки очок вона дасть. Лінії ведуть до сусідів, які додають або віднімають очки.', at: () => $('#hand'), side: 'top' },
+    tide: { text: 'Кожні 6 ходів приходить приплив, і вода піднімається на один уступ. Смугасті клітинки підуть під воду першими. Будівлі там зникнуть, але очки за них лишаться.', at: () => $('#tide-chip'), side: 'top' },
+    wall: { text: 'Дамба не тоне і не пропускає воду. Вода тече тільки через сторони клітинок, не через кути. Перекрий прохід, і земля за дамбою лишиться сухою.', at: () => document.querySelector('#hand .card[data-wall]') || $('#hand'), side: 'top' },
+    harvest: { text: 'Після припливу кожна вціліла будівля приносить +1 урожаю. Чим вище стоїть будівля, тим більше врожаїв вона збере.', at: () => $('#scorebox'), side: 'bottom' },
+  };
+  function coach(id) {
+    if (coachDone[id] || !st || st.idx !== 0) return;
+    coachStep = id;
+    const c = COACH[id], el = $('#coach');
+    $('#coach-text').textContent = c.text;
+    el.hidden = false; el.dataset.side = c.side;
+    positionCoach();
+  }
+  function positionCoach() {
+    const el = $('#coach');
+    if (el.hidden || !coachStep) return;
+    const c = COACH[coachStep]; const a = c.at();
+    const w = el.offsetWidth, h = el.offsetHeight, vw = window.innerWidth;
+    let x, y;
+    if (!a) { x = vw / 2 - w / 2; y = view.rect.y + 8; }
+    else {
+      const r = a.getBoundingClientRect();
+      x = clamp(r.left + r.width / 2 - w / 2, 12, vw - w - 12);
+      y = c.side === 'top' ? r.top - h - 14 : r.bottom + 14;
+      el.style.setProperty('--ax', clamp(r.left + r.width / 2 - x, 20, w - 20) + 'px');
+    }
+    el.style.transform = `translate(${Math.round(x)}px,${Math.round(Math.max(8, y))}px)`;
+  }
+  function coachDismiss(id) {
+    if (id && coachStep !== id) return;
+    if (coachStep) { coachDone[coachStep] = 1; store.set('coach', coachDone); }
+    coachStep = null; $('#coach').hidden = true;
+  }
+
+  // ---------- Дії гравця ----------
+  function selectCard(i) {
+    if (mode !== 'play' || !st || i >= st.hand.length) return;
+    sel = sel === i ? -1 : i;
+    Sfx.select();
+    hideIntro();
+    renderSel(); refreshPreview();
+    if (sel >= 0 && coachStep === 'hand') { coachDismiss('hand'); coach('hover'); }
+  }
+  function deselect() { if (sel >= 0) { sel = -1; renderSel(); refreshPreview(); } }
+  function doReroll() {
+    if (mode !== 'play' || !st) return;
+    if (!L.reroll(st)) { Sfx.bad(); shake($('#reroll')); return; }
+    sel = -1; Sfx.whoosh(); renderSel(); renderHand(true); refreshPreview(); save();
+    maybeWallCoach();
+  }
+  function shake(el) { if (!el) return; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+  function maybeWallCoach() {
+    if (!st || st.idx !== 0 || coachDone.wall || !coachDone.tide) return;
+    const i = st.hand.indexOf(T.WALL);
+    if (i < 0) return;
+    const card = document.querySelectorAll('#hand .card')[i];
+    if (card) card.setAttribute('data-wall', '1');
+    coach('wall');
+  }
+
+  async function doPlace(c) {
+    if (mode !== 'play' || sel < 0 || !L.canPlace(st, c)) return;
+    mode = 'busy'; document.body.classList.add('busy');
+    const type = st.hand[sel];
+    const flyFrom = new THREE.Vector3(wx(c), tileTop(st.height[c]) + BH[type] + 0.2, wz(c));
+    const forestObj = B.feats[c];
+    hover = -1; refreshPreview(); hideGhost();
+    const ev = L.place(st, c, sel, run.perks);
+    sel = -1; renderSel();
+    if (coachStep === 'hover') coachDismiss('hover');
+    if (ev.hadForest && forestObj) {
+      B.feats[c] = null;
+      B.trees = B.trees.filter((t) => t.parent !== forestObj);
+      tween({ dur: 200, ease: E.inCubic, update: (k) => forestObj.scale.setScalar(Math.max(0.001, 1 - k)) }).then(() => forestObj.parent && forestObj.parent.remove(forestObj));
+    }
+    const g = makeBuilding(type, c, st, false);
+    B.grp.add(g); B.bld.set(c, g);
+    if (type === T.WALL && B.tiles[c]) B.tiles[c].visible = false;
+    await dropIn(g);
+    Sfx.place(ev.score.total);
+    ripple(c, TYPE_COL[type], type === T.WALL ? wallH(c, st) : tileTop(st.height[c]));
+    let i = 0;
+    for (const p of ev.score.parts) {
+      if (p.cell === c || p.kind !== 'b') continue;
+      const nb = B.bld.get(p.cell);
+      if (nb && !nb.userData.hopping) { nb.userData.hopping = true; hop(nb, 40 * i, 0.12).then(() => { nb.userData.hopping = false; }); }
+      i++;
+    }
+    updatePick(c);
+    forecastAt = L.forecast(st);
+    const after = st.score;
+    flyScore(fmt(ev.score.total), flyFrom, ev.score.total < 0).then(() => { if (shownScore < after || st.score === after) setScore(after, true); });
+    renderHUD(); refreshForecast(-1);
+    save();
+    if (st.idx === 0 && !coachDone.tide) coach('tide');
+    if (ev.seasonEnd) {
+      $('#hand').innerHTML = ''; renderReroll();
+      if (st.idx === 0 && st.season === 0) { coachDismiss(); coach('harvest'); }
+      await sleep(650);
+      await runTide();
+    } else {
+      mode = 'play'; document.body.classList.remove('busy');
+      renderHand(true);
+      maybeWallCoach();
+      if (pendingHover >= 0) { hover = pendingHover; pendingHover = -1; }
+      refreshPreview();
+    }
+  }
+  let pendingHover = -1;
+
+  async function runTide() {
+    mode = 'busy'; document.body.classList.add('busy');
+    hover = -1; refreshPreview(); hideGhost();
+    D.forecast.clear(); D.map.clear(); clearChips('map');
+    const ev = L.tide(st, run.perks);
+    Sfx.tide();
+    banner(`${svgI('water', null, 16)}<b>Приплив</b><span>вода піднялась на ${ev.W}-й уступ</span>`, 'tide', 2400);
+    const top = waterTop(ev.W);
+    const ps = [];
+    const tw = (c, to, delay, dur) => {
+      let from = 0;
+      return tween({ dur, delay, ease: E.inOutCubic, start: () => { from = B.waterVis[c]; B.water[c].visible = true; }, update: (k) => { const v = lerp(from, to, k); B.waterVis[c] = v; B.water[c].scale.y = Math.max(0.001, v); } });
+    };
+    for (let c = 0; c < N * N; c++) if (B.waterVis[c] > 0) ps.push(tw(c, top, 0, 1300));
+    for (const o of ev.flooded) {
+      const c = o.c, delay = 300 + o.d * 130;
+      B.waterVis[c] = tileTop(st.height[c]) - 0.14; B.water[c].scale.y = B.waterVis[c];
+      ps.push(tw(c, top, delay, 650).then(() => { if (B.tiles[c]) B.tiles[c].visible = false; }));
+      tween({ dur: 1, delay: delay + 400 }).then(() => ripple(c, '#FFFFFF', top));
+    }
+    if (ev.lost.length) tween({ dur: 1, delay: 500 }).then(() => Sfx.sink());
+    for (const o of ev.lost) {
+      const g = B.bld.get(o.c); B.bld.delete(o.c);
+      ps.push(sinkObject(g, 380 + o.d * 130));
+      floatChip(`${svgI(ICON_OF[o.type], '#fff', 11)} затонула`, o.c, 380 + o.d * 130, 'lost');
+    }
+    for (const o of ev.drowned) {
+      const f = B.feats[o.c]; B.feats[o.c] = null;
+      if (f) { B.trees = B.trees.filter((t) => t.parent !== f); ps.push(sinkObject(f, 300 + o.d * 130)); }
+    }
+    for (const [c, g] of B.bld) {
+      if (g.userData.wallMesh) { const wm = g.userData.wallMesh, from = wm.scale.y, to = wallH(c, st); if (to > from) ps.push(tween({ dur: 900, delay: 150, ease: E.outBack, update: (k) => { wm.scale.y = lerp(from, to, k); } })); }
+    }
+    ps.push(applySeason(Math.min(st.season, SEASONS - 1), 1500, 450));
+    await Promise.all(ps);
+    updatePickAll();
+    forecastAt = L.forecast(st);
+    if (ev.harvested.length) {
+      banner(`${svgI('harvest', null, 16)}<b>Урожай ${fmt(ev.gain)}</b><span>${ev.harvested.length} ${plural(ev.harvested.length, 'будівля вистояла', 'будівлі вистояли', 'будівель вистояло')}</span>`, 'harvest', 2200);
+      const order = ev.harvested.slice().sort((a, b) => (L.cx(a) + L.cy(a)) - (L.cx(b) + L.cy(b)));
+      order.forEach((c, i) => { hop(B.bld.get(c), i * 45, 0.14); floatChip(`+${ev.H}`, c, i * 45, 'harvest'); if (i < 24) Sfx.harvest(i); });
+      setScore(st.score, true);
+      await sleep(Math.min(order.length, 30) * 45 + 650);
+    } else await sleep(300);
+    renderHUD(); refreshForecast(-1);
+    save();
+    if (coachStep === 'harvest') coachDismiss('harvest');
+    if (ev.islandOver) { await sleep(500); return islandOver(); }
+    banner(`<b>${L.SEASON_NAMES[st.season]}</b><span>сезон ${st.season + 1} з ${SEASONS}</span>`, 'season', 1800);
+    if (ev.noRoom) {
+      await sleep(900);
+      banner('<b>Сухої землі не лишилось</b><span>вода підніметься знову</span>', 'tide', 1800);
+      await sleep(900);
+      return runTide();
+    }
+    mode = 'play'; document.body.classList.remove('busy');
+    renderHand(true); refreshPreview();
+    maybeWallCoach();
+  }
+
+  // ---------- Острови і подорож ----------
+  function save() { if (run && (run.phase === 'play' || run.phase === 'perk')) store.set('run', run); else store.del('run'); }
+  function updateBest() {
+    const best = store.get('best', { total: 0, islands: 0, stars: 0 });
+    const cleared = run.stars.filter((s) => s > 0).length;
+    const stars = run.stars.reduce((a, b) => a + b, 0);
+    let changed = false;
+    if (run.total > best.total) { best.total = run.total; changed = true; }
+    if (cleared > best.islands) { best.islands = cleared; changed = true; }
+    if (stars > best.stars) { best.stars = stars; changed = true; }
+    if (changed) store.set('best', best);
+    return best;
+  }
+  function islandOver() {
+    const stars = L.finishIsland(run);
+    updateBest(); save();
+    mode = 'result'; document.body.classList.remove('busy');
+    showResult(stars, true);
+  }
+  function starRow(n, animate) {
+    return [0, 1, 2].map((i) => `<span class="rs ${i < n ? 'on' : ''} ${animate && i < n ? 'pop' : ''}" style="--d:${300 + i * 260}ms">${svgI('star', null, 34)}</span>`).join('');
+  }
+  function showResult(stars, animate) {
+    const s = run.st, el = $('#screen-result');
+    const ok = stars > 0;
+    const won = run.phase === 'won';
+    $('#res-eyebrow').textContent = `Острів ${s.idx + 1} / ${ISLANDS} · ${L.TRAITS[s.trait].name}`;
+    $('#res-title').textContent = ok ? `«${s.name}» вистояв` : `«${s.name}» пішов під воду`;
+    $('#res-sub').textContent = won ? 'Це був останній острів. На обрії видно Високий Берег, і море вже не наздожене громаду.'
+      : ok ? 'Громада вантажить човни і пливе далі. Обери здобуток, який допоможе на наступних островах.'
+        : `Не вистачило ${s.goals[0] - s.score} ${plural(s.goals[0] - s.score, 'очка', 'очок', 'очок')} до першої зірки. Подорож завершилась.`;
+    $('#res-stars').innerHTML = starRow(stars, animate);
+    $('#res-table').innerHTML = `
+      <div><span>Будівництво</span><b>${s.placeScore}</b></div>
+      <div><span>Урожай</span><b>${s.harvestScore}</b></div>
+      <div><span>Затонуло будівель</span><b>${s.lost}</b></div>
+      <div class="sum"><span>Разом</span><b>${s.score}</b></div>
+      <div class="goals">${s.goals.map((g, i) => `<span class="${s.score >= g ? 'on' : ''}">${'★'.repeat(i + 1)} ${g}</span>`).join('')}</div>`;
+    const perks = $('#res-perks'), acts = $('#res-actions');
+    perks.innerHTML = ''; acts.innerHTML = '';
+    if (run.phase === 'perk') {
+      perks.hidden = false;
+      const offer = L.perkOffer(run);
+      perks.innerHTML = '<div class="eyebrow">Здобуток для подорожі</div><div class="perk-grid">' + offer.map((p) => {
+        const ic = p.needs >= 0 ? svgI(ICON_OF[p.needs], '#fff', 16) : svgI('harvest', '#fff', 16);
+        const col = p.needs >= 0 ? TYPE_COL[p.needs] : COL.gold;
+        return `<button type="button" class="perk" data-id="${p.id}" style="--c:${col}"><span class="perk-ico">${ic}</span><span class="perk-name">${esc(p.name)}</span><span class="perk-desc">${esc(p.desc)}</span></button>`;
+      }).join('') + '</div>';
+      perks.querySelectorAll('.perk').forEach((b) => b.addEventListener('click', () => sail(b.dataset.id)));
+      if (!offer.length) acts.innerHTML = '<button type="button" class="btn primary" id="res-go">Плисти далі</button>';
+    } else {
+      perks.hidden = true;
+      const best = store.get('best', { total: 0, islands: 0 });
+      const cleared = run.stars.filter((x) => x > 0).length;
+      const totalStars = run.stars.reduce((a, b) => a + b, 0);
+      acts.innerHTML = `<div class="run-sum"><div><span>Подорож</span><b>${run.total}</b></div><div><span>Островів</span><b>${cleared} з ${ISLANDS}</b></div><div><span>Зірок</span><b>${totalStars}</b></div><div><span>Рекорд</span><b>${best.total}</b></div></div>
+        <div class="btn-row"><button type="button" class="btn primary" id="res-new">Нова подорож</button><button type="button" class="btn ghost" id="res-menu">У меню</button></div>`;
+    }
+    const go = $('#res-go'); if (go) go.addEventListener('click', () => sail(null));
+    const nw = $('#res-new'); if (nw) nw.addEventListener('click', () => startRun());
+    const mn = $('#res-menu'); if (mn) mn.addEventListener('click', () => toTitle());
+    el.hidden = false;
+    el.classList.remove('in'); void el.offsetWidth; el.classList.add('in');
+    if (animate) {
+      for (let i = 0; i < stars; i++) setTimeout(() => Sfx.star(i), (300 + i * 260) * TS);
+      if (!ok) Sfx.fail(); else if (won) setTimeout(() => Sfx.win(), 1000 * TS);
+    }
+  }
+  async function sail(perkId) {
+    if (mode === 'busy') return;
+    L.takePerk(run, perkId);
+    $('#screen-result').hidden = true;
+    await enterIsland(true);
+  }
+  async function enterIsland(fresh) {
+    mode = 'busy'; document.body.classList.add('busy', 'in-game');
+    sel = -1; hover = -1; mapMode = false;
+    hideGhost(); clearChips('preview'); clearChips('map'); links = []; renderLinks();
+    D.forecast.clear(); D.map.clear(); D.radius.clear(); D.cursor.clear(); D.saved.clear();
+    $('#hud').hidden = false;
+    $('#hand').innerHTML = '';
+    const old = B; B = null;
+    await exitBoard(old);
+    if (fresh) L.makeIsland(run);
+    st = run.st;
+    forecastAt = L.forecast(st);
+    cam.zoomT = 1; cam.pan.x = 0; cam.pan.y = 0;
+    applySeason(Math.min(st.season, SEASONS - 1), 0);
+    buildBoard(st);
+    renderHUD(); setScore(st.score, false);
+    measureRect();
+    await popIn(B, st);
+    save();
+    if (st.over) { if (run.phase === 'play') return islandOver(); mode = 'result'; document.body.classList.remove('busy'); showResult(L.starsFor(st), false); return; }
+    showIntro();
+    mode = 'play'; document.body.classList.remove('busy');
+    renderHand(true); refreshPreview();
+    if (st.idx === 0 && st.placed === 0) setTimeout(() => coach('hand'), 1200 * TS);
+    else maybeWallCoach();
+  }
+  function hideIntro() {
+    const el = $('#intro');
+    if (el.hidden || el.classList.contains('out')) return;
+    clearTimeout(showIntro.t);
+    el.classList.add('out'); setTimeout(() => { el.hidden = true; el.classList.remove('show', 'out'); }, 400);
+  }
+  function showIntro() {
+    const el = $('#intro');
+    const tr = L.TRAITS[st.trait];
+    el.innerHTML = `<div class="eyebrow">Острів ${st.idx + 1} / ${ISLANDS} · ${esc(tr.name)}</div><div class="intro-name">${esc(st.name)}</div><p>${esc(tr.desc)}</p><div class="intro-goals">${st.goals.map((g, i) => `<span>${'★'.repeat(i + 1)} ${g}</span>`).join('')}</div>`;
+    el.hidden = false; el.classList.remove('out'); void el.offsetWidth; el.classList.add('show');
+    clearTimeout(showIntro.t);
+    showIntro.t = setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.hidden = true; el.classList.remove('show', 'out'); }, 400); }, 3600 * TS);
+  }
+  async function startRun() {
+    Sfx.ensure();
+    $('#screen-start').hidden = true; $('#screen-result').hidden = true; $('#screen-help').hidden = true;
+    cam.orbit = false;
+    cam.thetaT = Math.PI / 4 + Math.round((cam.theta - Math.PI / 4) / (Math.PI / 2)) * (Math.PI / 2);
+    run = L.newRun((Math.random() * 4294967296) >>> 0);
+    await enterIsland(true);
+  }
+  async function continueRun(saved) {
+    Sfx.ensure();
+    $('#screen-start').hidden = true;
+    cam.orbit = false;
+    cam.thetaT = Math.PI / 4 + Math.round((cam.theta - Math.PI / 4) / (Math.PI / 2)) * (Math.PI / 2);
+    run = saved;
+    if (run.phase === 'perk') {
+      st = run.st;
+      document.body.classList.add('in-game'); $('#hud').hidden = false;
+      const old = B; B = null; await exitBoard(old);
+      forecastAt = L.forecast(st);
+      applySeason(SEASONS - 1, 0); buildBoard(st); renderHUD(); setScore(st.score, false); renderHand(false);
+      measureRect(); await popIn(B, st);
+      mode = 'result'; showResult(L.starsFor(st), false);
+      return;
+    }
+    await enterIsland(false);
+  }
+  async function toTitle() {
+    $('#screen-result').hidden = true; $('#screen-help').hidden = true; coachDismiss(); $('#coach').hidden = true;
+    $('#intro').hidden = true;
+    mode = 'title';
+    document.body.classList.remove('in-game', 'busy', 'has-sel');
+    $('#hud').hidden = true;
+    sel = -1; hover = -1; hideGhost(); clearChips('preview'); clearChips('map'); links = []; renderLinks();
+    D.forecast.clear(); D.map.clear(); D.radius.clear(); D.cursor.clear(); D.saved.clear();
+    run = null;
+    showStart();
+    const old = B; B = null; await exitBoard(old);
+    st = demoIsland();
+    applySeason(0, 0);
+    buildBoard(st); measureRect(); popIn(B, st);
+    cam.orbit = true;
+  }
+  function demoIsland() {
+    const r = L.newRun(20261021);
+    const s = L.makeIsland(r);
+    for (let k = 0; k < 14; k++) {
+      s.hand = L.drawHand(s);
+      const at = L.forecast(s); let best = null;
+      for (let h = 0; h < s.hand.length; h++) {
+        if (s.hand[h] === T.WALL) continue;
+        for (let c = 0; c < N * N; c++) if (L.canPlace(s, c)) { const v = L.scorePlacement(s, c, s.hand[h], []).total + L.harvestsFor(s, c, at); if (!best || v > best.v) best = { h, c, v }; }
+      }
+      if (best) L.place(s, best.c, best.h, []);
+    }
+    return s;
+  }
+  function showStart() {
+    const sc = $('#screen-start'); sc.hidden = false;
+    const saved = store.get('run', null);
+    const cont = $('#btn-continue');
+    if (saved && saved.st && (saved.phase === 'play' || saved.phase === 'perk')) {
+      cont.hidden = false;
+      $('#cont-sub').textContent = `острів ${saved.st.idx + 1} · ${saved.st.name} · ${saved.st.score} ${plural(saved.st.score, 'очко', 'очки', 'очок')}`;
+    } else cont.hidden = true;
+    const best = store.get('best', null);
+    $('#best-line').textContent = best && best.total ? `Рекорд: ${best.total} ${plural(best.total, 'очко', 'очки', 'очок')} · ${best.islands} ${plural(best.islands, 'острів', 'острови', 'островів')} · ${best.stars} ★` : 'Рекорду ще немає';
+    $('#best-line').hidden = false;
+  }
+
+  // ---------- Введення ----------
+  const raycaster = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  function pickCell(x, y) {
+    if (!B) return -1;
+    ndc.set((x / view.vw) * 2 - 1, -(y / view.vh) * 2 + 1);
+    raycaster.setFromCamera(ndc, camera);
+    const hits = raycaster.intersectObjects(B.pick, false);
+    return hits.length ? hits[0].object.userData.cell : -1;
+  }
+  const pointers = new Map();
+  let drag = null, pinch = null;
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse') touchMode = true; else touchMode = false;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* */ }
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 1) drag = { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, moved: false, btn: e.button };
+    else if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y), z0: cam.zoomT };
+      if (drag) drag.moved = true;
+    }
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    const p = pointers.get(e.pointerId);
+    if (p) {
+      p.x = e.clientX; p.y = e.clientY;
+      if (pinch && pointers.size >= 2) {
+        const [a, b] = [...pointers.values()];
+        cam.zoomT = clamp(pinch.z0 * Math.hypot(a.x - b.x, a.y - b.y) / Math.max(1, pinch.d0), 0.8, 2.6);
+      } else if (drag) {
+        const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+        if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 7) drag.moved = true;
+        if (drag.moved && mode !== 'title') { cam.pan.x -= dx / view.scale; cam.pan.y += dy / view.scale; }
+        drag.x = e.clientX; drag.y = e.clientY;
+      }
+    }
+    if (e.pointerType === 'mouse' && (!drag || !drag.moved)) {
+      const c = pickCell(e.clientX, e.clientY);
+      if (mode === 'busy') { pendingHover = c; return; }
+      if (c !== hover) { hover = c; refreshPreview(); }
+    }
+  });
+  function endPointer(e) {
+    const had = pointers.has(e.pointerId);
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinch = null;
+    if (!had) return;
+    if (pointers.size === 0) {
+      const d = drag; drag = null;
+      if (d && !d.moved && e.type === 'pointerup' && d.btn === 0) onTap(e);
+    }
+  }
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+  canvas.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && mode === 'play') { hover = -1; pendingHover = -1; refreshPreview(); } });
+  canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (mode === 'title') return; cam.zoomT = clamp(cam.zoomT * Math.exp(-e.deltaY * 0.0012), 0.8, 2.6); }, { passive: false });
+  canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); deselect(); });
+  function onTap(e) {
+    if (mode !== 'play') return;
+    const c = pickCell(e.clientX, e.clientY);
+    if (e.pointerType === 'mouse') {
+      if (c >= 0 && sel >= 0 && L.canPlace(st, c)) doPlace(c);
+      else if (c >= 0 && sel < 0 && L.canPlace(st, c)) { shake($('#hand')); banner('<b>Спершу обери карту</b><span>клавіші 1, 2, 3 або клік по карті</span>', '', 1600); }
+      else if (c >= 0 && sel >= 0) Sfx.bad();
+      return;
+    }
+    if (c < 0) { hover = -1; refreshPreview(); return; }
+    if (sel >= 0 && c === hover && L.canPlace(st, c)) doPlace(c);
+    else { hover = c; refreshPreview(); }
+  }
+  window.addEventListener('keydown', (e) => {
+    if (e.target && e.target.closest && e.target.closest('input,textarea')) return;
+    if (!$('#screen-help').hidden) { if (e.key === 'Escape') closeHelp(); return; }
+    if (mode !== 'play' && mode !== 'busy') return;
+    const k = e.code;
+    if (k === 'Digit1' || k === 'Numpad1') selectCard(0);
+    else if (k === 'Digit2' || k === 'Numpad2') selectCard(1);
+    else if (k === 'Digit3' || k === 'Numpad3') selectCard(2);
+    else if (k === 'KeyR') doReroll();
+    else if (k === 'KeyQ') rotate(-1);
+    else if (k === 'KeyE') rotate(1);
+    else if (k === 'KeyM') toggleMap();
+    else if (e.key === 'Escape') deselect();
+    else return;
+    e.preventDefault();
+  });
+  function toggleMap() { mapMode = !mapMode; $('#btn-map').classList.toggle('on', mapMode); $('#btn-map').setAttribute('aria-pressed', mapMode); refreshPreview(); Sfx.select(); }
+  function openHelp() {
+    const el = $('#screen-help'); el.hidden = false; el.classList.remove('in'); void el.offsetWidth; el.classList.add('in');
+    $('#help-ingame').hidden = !(run && mode !== 'title');
+    $('#help-cards').innerHTML = [0, 1, 2, 3, 4, 5].map((t) => `<div class="card mini" style="--c:${TYPE_COL[t]}">${cardHTML(t, t)}</div>`).join('');
+    $('#btn-help-close').focus();
+  }
+  function closeHelp() { $('#screen-help').hidden = true; }
+
+  $('#btn-new').addEventListener('click', () => startRun());
+  $('#btn-continue').addEventListener('click', () => { const s = store.get('run', null); if (s) continueRun(s); });
+  $('#btn-how').addEventListener('click', openHelp);
+  $('#btn-help').addEventListener('click', openHelp);
+  $('#btn-help-close').addEventListener('click', closeHelp);
+  $('#btn-quit').addEventListener('click', () => { closeHelp(); toTitle(); });
+  $('#btn-restart').addEventListener('click', () => { closeHelp(); startRun(); });
+  $('#screen-help').addEventListener('click', (e) => { if (e.target.id === 'screen-help') closeHelp(); });
+  $('#btn-rot-l').addEventListener('click', () => rotate(-1));
+  $('#btn-rot-r').addEventListener('click', () => rotate(1));
+  $('#btn-map').addEventListener('click', toggleMap);
+  $('#btn-sound').addEventListener('click', () => { Sfx.on = !Sfx.on; store.set('sound', Sfx.on); $('#btn-sound').classList.toggle('off', !Sfx.on); $('#btn-sound').setAttribute('aria-pressed', String(Sfx.on)); if (Sfx.on) Sfx.select(); });
+  $('#reroll').addEventListener('click', doReroll);
+  $('#coach-ok').addEventListener('click', () => coachDismiss());
+  window.addEventListener('resize', () => { layout(); positionCoach(); });
+
+  // ---------- Головний цикл ----------
+  let last = performance.now();
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.05, (now - last) / 1000); last = now; NOW = now;
+    stepTweens();
+    if (cam.orbit && !REDUCED) cam.thetaT += dt * 0.07;
+    const kk = 1 - Math.exp(-dt * 7);
+    cam.theta += (cam.thetaT - cam.theta) * kk;
+    cam.zoom += (cam.zoomT - cam.zoom) * kk;
+    const r = view.rect, rt = view.rectT, kr = 1 - Math.exp(-dt * 5);
+    r.x += (rt.x - r.x) * kr; r.y += (rt.y - r.y) * kr; r.w += (rt.w - r.w) * kr; r.h += (rt.h - r.h) * kr;
+    placeCamera(cam.theta);
+    applyFrustum();
+    const t = now / 1000;
+    if (B) {
+      for (const tr of B.trees) tr.rotation.z = Math.sin(t * 1.4 + tr.userData.phase) * 0.035;
+      for (const [, g] of B.bld) {
+        const a = g.userData.anim; if (!a) continue;
+        if (a.saw) a.saw.rotation.y = t * 3;
+        if (a.beam) a.beam.rotation.y = t * 0.9 + a.phase;
+        if (a.boat) { a.boat.position.y = (B.waterVis[a.wc] || waterTop(st.W)) - tileTop(a.h) + 0.01 + Math.sin(t * 2 + a.phase) * 0.012; a.boat.rotation.z = Math.sin(t * 1.6 + a.phase) * 0.06; }
+      }
+    }
+    if (ghost) ghost.position.y = ghost.userData.baseY + 0.07 + Math.sin(t * 4) * 0.025;
+    renderer.render(scene, camera);
+    for (const it of overlay) placeItem(it);
+    if (links.length) renderLinks();
+  }
+
+  // ---------- Старт ----------
+  view.ext = computeExtents();
+  layout();
+  view.rect = Object.assign({}, view.rectT);
+  syncBodyBg();
+  $('#btn-sound').classList.toggle('off', !Sfx.on);
+  requestAnimationFrame(frame);
+
+  function boot(data) {
+    if (data && data.run && data.run.st) { showStart(); st = demoIsland(); buildBoard(st); measureRect(); continueRun(data.run); return; }
+    toTitle();
+  }
+  const hot = window.claude && window.claude.hot;
+  if (hot && hot.snapshot) { try { hot.snapshot(() => ({ run: run ? L.clone(run) : null })); } catch (e) { /* */ } }
+  if (hot && hot.ready) hot.ready(boot); else boot(hot && hot.data ? hot.data : {});
+
+  // для автоматичної перевірки
+  window.__priplyv = {
+    state: () => ({ mode, run, st, sel, hover }),
+    place: (c, h) => { sel = h; return doPlace(c); },
+    select: selectCard, pick: pickCell, start: startRun,
+    screen: (c) => { const g = new THREE.Vector3(wx(c), tileTop(st.height[c]), wz(c)); return toScreen(g); },
+  };
+})();
+
+</script>
+</body>
+</html>

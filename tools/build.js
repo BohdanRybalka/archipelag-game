@@ -3,7 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const THREE_CDN = '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>';
+// integrity: браузер не виконає файл, якщо його підмінять на CDN (хеш three@0.128.0 з npm, збігається з cdnjs)
+const THREE_CDN = '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>';
 
 function buildPage(srcDir) {
   const read = (f) => fs.readFileSync(path.join(srcDir, f), 'utf8');

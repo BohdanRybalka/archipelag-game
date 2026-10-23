@@ -72,7 +72,7 @@
 | Крок | Назва | Статус | PR | Примітки |
 |---|---|---|---|---|
 | 0 | Страховка | готово | [#3](https://github.com/BohdanRybalka/archipelag-game/pull/3) | `npm run check` ~2 хв (майже весь час `check:ui`) |
-| 1 | Мертвий код і текст | не почато | | |
+| 1 | Мертвий код і текст | готово | [#4](https://github.com/BohdanRybalka/archipelag-game/pull/4) | лишено `COL.pier` і `bridges: []` у фікстурі; `game.js` −220 рядків |
 | 2 | Правила в logic.js | не почато | | |
 | 3 | Модулі, esbuild, Prettier | не почато | | |
 | 4 | Сесія, режими, dispatch | не почато | | |

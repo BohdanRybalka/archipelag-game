@@ -1700,15 +1700,9 @@
   $('#btn-sound').classList.toggle('off', !Sfx.on);
   requestAnimationFrame(frame);
 
-  function boot(data) {
-    if (data && data.st && !data.st.over && data.st.v === 4) { startLevel(data.st.li, data.st); return; }
-    toTitle();
-  }
-  const hot = window.claude && window.claude.hot;
-  if (hot && hot.snapshot) { try { hot.snapshot(() => ({ st: st && document.body.classList.contains('in-game') && !st.over ? L.clone(st) : null })); } catch (e) { /* */ } }
-  if (hot && hot.ready) hot.ready(boot); else boot(hot && hot.data ? hot.data : {});
+  toTitle();
 
-  // для автоматичної перевірки
+  // хук для перевірок у браузері (tools/check-ui.js): не прибирати
   window.__arch = {
     state: () => ({ mode, st, tool, hover }),
     build: (t, c) => { tool = t; return doBuild(c); },
